@@ -45,12 +45,6 @@ public class FormCheckout {
 	@Value("${sber.failUrl}")
 	private String failUrl;
 
-	/**
-	 * validate account
-	 * 
-	 * @param exchange
-	 * @throws Exception
-	 */
 	@Handler
 	public void validate(Exchange exchange) throws Exception {
 		Message message = exchange.getIn();

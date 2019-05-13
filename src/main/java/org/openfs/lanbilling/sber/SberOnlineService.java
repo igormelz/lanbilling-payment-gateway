@@ -1,6 +1,5 @@
 package org.openfs.lanbilling.sber;
 
-import java.util.Map;
 import java.util.regex.Pattern;
 import org.apache.camel.Exchange;
 import org.apache.camel.Message;
@@ -28,19 +27,18 @@ public class SberOnlineService implements Processor {
 	@Override
 	public void process(Exchange exchange) throws Exception {
 		Message message = exchange.getIn();
-
 		message.removeHeaders("Camel*");
 
 		// validate action
 		if (message.getHeader("ACTION") == null) {
-			log.error("Parameter [ACTION] not found");
+			log.error("Parameter [ACTION] not found in query string");
 			message.setBody(new SberOnlineResponse(SberOnlineResponse.CodeResponse.WRONG_ACTION));
 			return;
 		}
 
 		// validate account parameter
 		if (message.getHeader("ACCOUNT") == null) {
-			log.error("Parameter [ACCOUNT] not found");
+			log.error("Parameter [ACCOUNT] not found in query string");
 			message.setBody(new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_WRONG_FORMAT));
 			return;
 		}
@@ -89,15 +87,14 @@ public class SberOnlineService implements Processor {
 	}
 
 	protected SberOnlineResponse checkAccount(String account) {
-		log.info("Try to check account:{}", account);
+		log.info("Process check account:{}", account);
 
 		// connect to LB
 		if (!lbapi.connect()) {
 			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.BACKEND_ERR);
 		}
 
-		// call service for account
-		//ServiceResponse response = lbapi.getAccountByAgreementNumber(account);
+		// call service for lookup account
 		ServiceResponse response = lbapi.getAccount(CodeExternType.AGRM_NUM, account);
 
 		// disconnect
@@ -113,60 +110,63 @@ public class SberOnlineService implements Processor {
 		if (response.isFault()) {
 			String errorStr = (String) response.getBody();
 			if (errorStr.matches(".*not found.*")) {
-				log.warn("Check account:{} not found:{}", account, errorStr);
+				log.warn("Account:{} not found:{}", account, errorStr);
 				return new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_NOT_FOUND);
 			}
-			log.error("Check account:{} has fault:{}", account, errorStr);
+			log.error("Lookup account:{} has fault:{}", account, errorStr);
 			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.BACKEND_ERR);
 		}
 
 		// process success response
-		Map<String, Object> values = response.getValues();
 		SberOnlineResponse ret = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
-		ret.setFio(values.get("name").toString());
-		log.info("Check account:{} success, FIO:{}", account, values.get("name").toString());
+		ret.setFio(response.getValue("name").toString());
+		log.info("Success check account:{}, FIO:{}", account, response.getValue("name"));
 		return ret;
 	}
 
 	protected SberOnlineResponse processPayment(String account, String amount, String pay_id, String pay_date) {
-		log.info("Try to payment account:{}, amount:{}, pay_id:{}, pay_date:{}", account, amount, pay_id, pay_date);
+		log.info("Process payment account:{}, amount:{}, pay_id:{}, pay_date:{}", account, amount, pay_id, pay_date);
 
 		// connect to LB
 		if (!lbapi.connect()) {
 			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.BACKEND_ERR);
 		}
-		
-		// check account 
+
+		// check account
 		ServiceResponse response = lbapi.getAccountByAgreementNumber(account);
 		if (!response.isSuccess()) {
-			log.error("Account not found:{}",account);
+			log.error("Account:{} not found", account);
+			lbapi.disconnect();
 			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_NOT_FOUND);
 		}
-		// process account response 
-		long acctid = (long) response.getValues().get("uid");
+		// process account response
+		long acctid = (long) response.getValue("uid");
 		log.info("Found UID:{} for account:{}", acctid, account);
 
 		// get agreement id
 		response = lbapi.getAgreementId(acctid);
 		if (!response.isSuccess()) {
 			log.error("Aggrement not found for account:{}", account);
+			lbapi.disconnect();
 			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_NOT_FOUND);
 		}
 		long argmid = (long) response.getValues().get("agrmid");
 		log.info("Found argmid:{} for account:{}", argmid, account);
 
-		// do payment 
+		// do payment
 		lbapi.doPayment(pay_id, Double.parseDouble(amount), argmid);
 		if (!response.isSuccess()) {
 			if (response.isFault()) {
-				log.warn("doPayment return error:{}", response.getBody());
+				log.warn("Call doPayment return error:{}", response.getBody());
 			} else {
-				log.error("doPayment has no response");
+				log.error("Call doPayment has no response");
 			}
+			lbapi.disconnect();
 			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.BACKEND_ERR);
 		}
 		log.info("Payment success:{}", ((PaymentResponse) response.getBody()).getRet());
 		SberOnlineResponse ret = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
+		lbapi.disconnect();
 		return ret;
 	}
 

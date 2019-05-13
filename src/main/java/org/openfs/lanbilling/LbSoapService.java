@@ -77,42 +77,30 @@ public class LbSoapService {
 			log.error("Connect return empty LoginResponse");
 			return false;
 		}
-
+		
+		// save manager ID for using on next service calls 
 		this.managerId = loginResponse.getRet().get(0).getManager().getPersonid();
-		// log.info("Connected as id:{}", managerId);
 		return true;
 	}
 
 	public void disconnect() {
 		try {
 			producer.sendBody(new Logout());
-			// log.info("Disconnect");
 		} catch (CamelExecutionException e) {
 			log.error("Disconnect exception:{}", e.getMessage());
 		}
 	}
 
-	/**
-	 * call SOAP:insPrePayment for checkout
-	 * 
-	 * @param argmid
-	 * @param amount
-	 * @return
-	 */
 	public ServiceResponse insertPrePayment(Long argmid, Double amount) {
-		// prepare payment data
+		// fill payment data
 		SoapPrePayment data = new SoapPrePayment();
-		// set argeement id
 		data.setAgrmid(argmid);
-		// set amount
 		data.setAmount(amount);
-		// set default currency name
 		data.setCurname("RUR");
-		// add comment
 		data.setComment("checkout");
-		// set current date
 		data.setPaydate(sdf.format(new Date()));
-		// process pre-payment service request
+		
+		// insert pre-payment 
 		InsPrePayment request = new InsPrePayment();
 		request.setVal(data);
 		ServiceResponse response = callService(request);
@@ -128,7 +116,6 @@ public class LbSoapService {
 	}
 
 	public ServiceResponse getAccountByAgreementNumber(String account) {
-		// prepare filter
 		SoapFilter flt = new SoapFilter();
 		flt.setAgrmnum(account);
 		GetAccounts request = new GetAccounts();
@@ -181,12 +168,6 @@ public class LbSoapService {
 		return callService(request);
 	}
 
-	/**
-	 * <b>Special operation</b> cancel
-	 * 
-	 * @param receipt
-	 * @return serviceResponse
-	 */
 	public ServiceResponse cancelPayment(String receipt) {
 		ExternCancelPayment request = new ExternCancelPayment();
 		request.setReceipt(receipt);
@@ -194,13 +175,6 @@ public class LbSoapService {
 		return callService(request);
 	}
 
-	/**
-	 * <b>Sprecial operation</b> getAccount
-	 * 
-	 * @param id  code extern type 
-	 * @param str lookup string
-	 * @return ServiceResponse
-	 */
 	public ServiceResponse getAccount(CodeExternType id, String str) {
 		GetExternAccount request = new GetExternAccount();
 		request.setId(id.getCode());
@@ -287,9 +261,9 @@ public class LbSoapService {
 	}
 
 	public enum CodeExternType {
-		VG_LOGIN(0), // "vgroups.login",
-		USER_LOGIN(1), // "accounts.login"
-		TEL_STAFF(2), // "tel_staff.phone_number ( ts join vgroups v on ts.vg_id = v.vg_id )
+		VG_LOGIN(0), // vgroups.login
+		USER_LOGIN(1), // accounts.login
+		TEL_STAFF(2), // tel_staff.phone_number ( ts join vgroups v on ts.vg_id = v.vg_id )
 		STAFF(3), // staff.segment ( ts join vgroups v on ts.vg_id = v.vg_id )
 		FIO(4), // accounts.name
 		AGRM_NUM(5), // agreements.number
