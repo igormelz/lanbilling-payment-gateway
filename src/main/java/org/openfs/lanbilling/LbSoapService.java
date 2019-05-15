@@ -76,8 +76,8 @@ public class LbSoapService {
 			LOG.error("Connect return empty LoginResponse");
 			return false;
 		}
-		
-		// save manager ID for using on next service calls 
+
+		// save manager ID for using on next service calls
 		this.managerId = loginResponse.getRet().get(0).getManager().getPersonid();
 		return true;
 	}
@@ -98,18 +98,15 @@ public class LbSoapService {
 		data.setCurname("RUR");
 		data.setComment("checkout");
 		data.setPaydate(sdf.format(new Date()));
-		
-		// insert pre-payment 
+
+		// insert pre-payment
 		InsPrePayment request = new InsPrePayment();
 		request.setVal(data);
 		ServiceResponse response = callService(request);
 		if (response.getStatus() == ServiceResponseStatus.SUCCESS) {
 			// parse response
 			InsPrePaymentResponse answer = (InsPrePaymentResponse) response.getBody();
-			if (answer != null) {
-				return new ServiceResponse(response.getStatus(),
-						Collections.singletonMap("orderNumber", answer.getRet()));
-			}
+			return new ServiceResponse(response.getStatus(), Collections.singletonMap("orderNumber", answer.getRet()));
 		}
 		return response;
 	}
@@ -123,14 +120,15 @@ public class LbSoapService {
 		if (response.getStatus() == ServiceResponseStatus.SUCCESS) {
 			// parse response
 			GetAccountsResponse answer = (GetAccountsResponse) response.getBody();
-			if (!answer.getRet().isEmpty()) {
-				HashMap<String, Object> values = new HashMap<String, Object>(2);
-				values.put("name", answer.getRet().get(0).getAccount().getName());
-				values.put("phone", answer.getRet().get(0).getAccount().getMobile());
-				values.put("email", answer.getRet().get(0).getAccount().getEmail());
-				values.put("uid", answer.getRet().get(0).getAccount().getUid());
-				return new ServiceResponse(response.getStatus(), values);
+			if (answer.getRet().isEmpty()) {
+				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
+			HashMap<String, Object> values = new HashMap<String, Object>(2);
+			values.put("name", answer.getRet().get(0).getAccount().getName());
+			values.put("phone", answer.getRet().get(0).getAccount().getMobile());
+			values.put("email", answer.getRet().get(0).getAccount().getEmail());
+			values.put("uid", answer.getRet().get(0).getAccount().getUid());
+			return new ServiceResponse(response.getStatus(), values);
 		}
 		return response;
 	}
@@ -144,11 +142,13 @@ public class LbSoapService {
 		if (response.getStatus() == ServiceResponseStatus.SUCCESS) {
 			// parse response
 			GetAgreementsResponse answer = (GetAgreementsResponse) response.getBody();
-			if (!answer.getRet().isEmpty()) {
-				HashMap<String, Object> values = new HashMap<String, Object>(2);
-				values.put("argmid", answer.getRet().get(0).getAgrmid());
-				return new ServiceResponse(response.getStatus(), values);
+			if (answer.getRet().isEmpty()) {
+				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
+			HashMap<String, Object> values = new HashMap<String, Object>(2);
+			values.put("argmid", answer.getRet().get(0).getAgrmid());
+			return new ServiceResponse(response.getStatus(), values);
+
 		}
 		return response;
 	}
@@ -182,7 +182,7 @@ public class LbSoapService {
 		if (response.isSuccess()) {
 			GetExternAccountResponse answer = (GetExternAccountResponse) response.getBody();
 			if (answer.getRet().isEmpty()) {
-				return new ServiceResponse(ServiceResponseStatus.ERROR, null);
+				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
 			SoapAccountFull account = answer.getRet().get(0);
 			// put contract number to contract id
@@ -220,14 +220,15 @@ public class LbSoapService {
 		if (response.getStatus() == ServiceResponseStatus.SUCCESS) {
 			// parse response
 			GetPrePaymentsResponse answer = (GetPrePaymentsResponse) response.getBody();
-			if (!answer.getRet().isEmpty()) {
-				HashMap<String, Object> values = new HashMap<String, Object>(2);
-				values.put("agrmid", answer.getRet().get(0).getAgrmid());
-				values.put("amount", answer.getRet().get(0).getAmount());
-				values.put("paymentid", answer.getRet().get(0).getPaymentid());
-				values.put("receipt", answer.getRet().get(0).getReceipt());
-				return new ServiceResponse(response.getStatus(), values);
+			if (answer.getRet().isEmpty()) {
+				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
+			HashMap<String, Object> values = new HashMap<String, Object>(4);
+			values.put("agrmid", answer.getRet().get(0).getAgrmid());
+			values.put("amount", answer.getRet().get(0).getAmount());
+			values.put("paymentid", answer.getRet().get(0).getPaymentid());
+			values.put("receipt", answer.getRet().get(0).getReceipt());
+			return new ServiceResponse(response.getStatus(), values);
 		}
 		return response;
 	}
@@ -291,7 +292,7 @@ public class LbSoapService {
 	}
 
 	public enum ServiceResponseStatus {
-		SUCCESS, NO_RESPONSE, FAULT, ERROR
+		SUCCESS, NO_RESPONSE, FAULT, ERROR, EMPTY_RESPONSE
 	}
 
 	public class ServiceResponse implements Serializable {
