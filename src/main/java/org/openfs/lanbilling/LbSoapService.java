@@ -11,7 +11,6 @@ import java.util.stream.Collectors;
 import org.apache.camel.CamelExecutionException;
 import org.apache.camel.EndpointInject;
 import org.apache.camel.ProducerTemplate;
-import org.openfs.lanbilling.sber.SberOnlineService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,7 +42,7 @@ import lb.api3.SoapPrePayment;
 @Service
 @Configuration
 public class LbSoapService {
-	private static final Logger log = LoggerFactory.getLogger(SberOnlineService.class);
+	private static final Logger LOG = LoggerFactory.getLogger(LbSoapService.class);
 	private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
 	@EndpointInject(uri = "direct:lbsoap")
@@ -68,13 +67,13 @@ public class LbSoapService {
 	public boolean connect() {
 		ServiceResponse response = callService(getLogin());
 		if (response.getStatus() != ServiceResponseStatus.SUCCESS) {
-			log.error("Connect fail");
+			LOG.error("Connect fail");
 			return false;
 		}
 
 		LoginResponse loginResponse = (LoginResponse) response.getBody();
 		if (loginResponse.getRet().isEmpty()) {
-			log.error("Connect return empty LoginResponse");
+			LOG.error("Connect return empty LoginResponse");
 			return false;
 		}
 		
@@ -87,7 +86,7 @@ public class LbSoapService {
 		try {
 			producer.sendBody(new Logout());
 		} catch (CamelExecutionException e) {
-			log.error("Disconnect exception:{}", e.getMessage());
+			LOG.error("Disconnect exception:{}", e.getMessage());
 		}
 	}
 
@@ -244,7 +243,7 @@ public class LbSoapService {
 			}
 			return new ServiceResponse(ServiceResponseStatus.SUCCESS, response);
 		} catch (CamelExecutionException e) {
-			log.error("ServiceCall:{} got exception:{}", request.getClass().getSimpleName(), e.getMessage());
+			LOG.error("ServiceCall:{} got exception:{}", request.getClass().getSimpleName(), e.getMessage());
 			return new ServiceResponse(ServiceResponseStatus.ERROR, null);
 		}
 	}
@@ -253,7 +252,7 @@ public class LbSoapService {
 		if (login != null) {
 			return login;
 		}
-		log.info("Create Login");
+		LOG.info("Create Login");
 		this.login = new Login();
 		this.login.setLogin(name);
 		this.login.setPass(pwd);
