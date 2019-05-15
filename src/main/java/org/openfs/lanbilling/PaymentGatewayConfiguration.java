@@ -72,6 +72,7 @@ public class PaymentGatewayConfiguration extends RouteBuilder {
 				.constant("application/x-www-form-urlencoded").setHeader(Exchange.HTTP_METHOD).constant("POST")
 				.to("undertow:https://{{sber.Url}}?throwExceptionOnFailure=false&sslContextParameters=#sslContext")
 				.unmarshal().json(JsonLibrary.Fastjson, Map.class);
+		
 	}
 
 }
