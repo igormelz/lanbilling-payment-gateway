@@ -45,6 +45,16 @@ public class LbSoapService {
 	private static final Logger LOG = LoggerFactory.getLogger(LbSoapService.class);
 	private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
+	public static final String FIELD_NAME = "name";
+	public static final String FIELD_PHONE = "phone";
+	public static final String FIELD_EMAIL = "email";
+	public static final String FIELD_UID = "uid";
+	public static final String FIELD_AMOUNT = "amount";
+	public static final String FIELD_AGREEMENT_ID = "agrmId";
+	public static final String FIELD_RECEIPT = "receipt";
+	public static final String FIELD_PAYMENT_ID = "paymentId";
+	public static final String FIELD_ORDER_NUMBER = "orderNumber";
+	
 	@EndpointInject(uri = "direct:lbsoap")
 	ProducerTemplate producer;
 
@@ -90,10 +100,10 @@ public class LbSoapService {
 		}
 	}
 
-	public ServiceResponse insertPrePayment(Long argmid, Double amount) {
+	public ServiceResponse insertPrePayment(Long agreementId, Double amount) {
 		// fill payment data
 		SoapPrePayment data = new SoapPrePayment();
-		data.setAgrmid(argmid);
+		data.setAgrmid(agreementId);
 		data.setAmount(amount);
 		data.setCurname("RUR");
 		data.setComment("checkout");
@@ -106,7 +116,7 @@ public class LbSoapService {
 		if (response.getStatus() == ServiceResponseStatus.SUCCESS) {
 			// parse response
 			InsPrePaymentResponse answer = (InsPrePaymentResponse) response.getBody();
-			return new ServiceResponse(response.getStatus(), Collections.singletonMap("orderNumber", answer.getRet()));
+			return new ServiceResponse(response.getStatus(), Collections.singletonMap(FIELD_ORDER_NUMBER, answer.getRet()));
 		}
 		return response;
 	}
@@ -123,11 +133,11 @@ public class LbSoapService {
 			if (answer.getRet().isEmpty()) {
 				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
-			HashMap<String, Object> values = new HashMap<String, Object>(2);
-			values.put("name", answer.getRet().get(0).getAccount().getName());
-			values.put("phone", answer.getRet().get(0).getAccount().getMobile());
-			values.put("email", answer.getRet().get(0).getAccount().getEmail());
-			values.put("uid", answer.getRet().get(0).getAccount().getUid());
+			HashMap<String, Object> values = new HashMap<String, Object>();
+			values.put(FIELD_NAME, answer.getRet().get(0).getAccount().getName());
+			values.put(FIELD_PHONE, answer.getRet().get(0).getAccount().getMobile());
+			values.put(FIELD_EMAIL, answer.getRet().get(0).getAccount().getEmail());
+			values.put(FIELD_UID, answer.getRet().get(0).getAccount().getUid());
 			return new ServiceResponse(response.getStatus(), values);
 		}
 		return response;
@@ -145,21 +155,20 @@ public class LbSoapService {
 			if (answer.getRet().isEmpty()) {
 				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
-			HashMap<String, Object> values = new HashMap<String, Object>(2);
-			values.put("argmid", answer.getRet().get(0).getAgrmid());
-			return new ServiceResponse(response.getStatus(), values);
+			return new ServiceResponse(response.getStatus(),
+					Collections.singletonMap(FIELD_AGREEMENT_ID, answer.getRet().get(0).getAgrmid()));
 
 		}
 		return response;
 	}
 
-	public ServiceResponse doPayment(String receipt, Double amount, long argmid) {
+	public ServiceResponse doPayment(String receipt, Double amount, long agreementId) {
 		SoapPayment val = new SoapPayment();
 		val.setModperson(this.managerId);
 		val.setReceipt(receipt);
 		val.setAmount(amount);
 		val.setPaydate(sdf.format(new Date()));
-		val.setAgrmid(argmid);
+		val.setAgrmid(agreementId);
 		val.setComment("PaymentGateway:SberOnline");
 
 		Payment request = new Payment();
@@ -189,7 +198,7 @@ public class LbSoapService {
 			Map<String, Object> values = account.getAgreements().stream()
 					.collect(Collectors.toMap(a -> a.getNumber(), a -> a.getAgrmid()));
 			// put account name
-			values.put("name", account.getAccount().getName());
+			values.put(FIELD_NAME, account.getAccount().getName());
 			return new ServiceResponse(response.getStatus(), values);
 		}
 		return response;
@@ -223,17 +232,17 @@ public class LbSoapService {
 			if (answer.getRet().isEmpty()) {
 				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
-			HashMap<String, Object> values = new HashMap<String, Object>(4);
-			values.put("agrmid", answer.getRet().get(0).getAgrmid());
-			values.put("amount", answer.getRet().get(0).getAmount());
-			values.put("paymentid", answer.getRet().get(0).getPaymentid());
-			values.put("receipt", answer.getRet().get(0).getReceipt());
+			HashMap<String, Object> values = new HashMap<String, Object>();
+			values.put(FIELD_AGREEMENT_ID, answer.getRet().get(0).getAgrmid());
+			values.put(FIELD_AMOUNT, answer.getRet().get(0).getAmount());
+			values.put(FIELD_PAYMENT_ID, answer.getRet().get(0).getPaymentid());
+			values.put(FIELD_RECEIPT, answer.getRet().get(0).getReceipt());
 			return new ServiceResponse(response.getStatus(), values);
 		}
 		return response;
 	}
 
-	public ServiceResponse callService(Object request) {
+	protected ServiceResponse callService(Object request) {
 		try {
 			Object response = producer.requestBody(request);
 			if (response == null) {
@@ -340,6 +349,15 @@ public class LbSoapService {
 			}
 			return values.get(name);
 		}
+		
+		public Long getLong(String name) {
+			return getValue(name) != null ? (long) getValue(name) : null;
+		}
+		
+		public String getString(String name) {
+			return getValue(name) != null ? getValue(name).toString() : null;
+		}
+		
 	}
 
 }

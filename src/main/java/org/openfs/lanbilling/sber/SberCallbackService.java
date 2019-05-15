@@ -20,6 +20,44 @@ public class SberCallbackService implements Processor {
 	@Autowired
 	LbSoapService lbapi;
 
+	@Override
+	public void process(Exchange exchange) throws Exception {
+		Message message = exchange.getIn();
+		message.removeHeaders("Camel*");
+
+		// connect to LB
+		if (!lbapi.connect()) {
+			message.setHeader(Exchange.HTTP_RESPONSE_CODE, 503);
+			return;
+		}
+
+		// validate query parameters
+		if (message.getHeader("status") == null || message.getHeader("mdOrder") == null
+				|| message.getHeader("operation") == null || message.getHeader("orderNumber") == null) {
+			LOG.error("Some query parameter is absent");
+			message.setHeader(Exchange.HTTP_RESPONSE_CODE, 400);
+			return;
+		}
+
+		// process request and set response code
+		message.setHeader(Exchange.HTTP_RESPONSE_CODE,
+				doProcess(message.getHeader("status", Integer.class), message.getHeader("operation", String.class),
+						message.getHeader("orderNumber", Long.class), message.getHeader("mdOrder", String.class)));
+
+		// close connection
+		lbapi.disconnect();
+	}
+
+	protected int doProcess(int status, String operation, Long orderNumber, String receipt) {
+		if (status == 1)
+			return doProcessSuccess(operation, orderNumber, receipt);
+		if (status == 0)
+			return doProcessUnsuccess(operation, orderNumber);
+		// unsupported status
+		LOG.error("Received unknown status: {}", status);
+		return 404;
+	}
+
 	private int doProcessSuccess(String operation, Long orderNumber, String receipt) {
 		LOG.info("Processing successful status for orderNumber:{}, operation:{}, receipt:{}", orderNumber, operation,
 				receipt);
@@ -42,7 +80,7 @@ public class SberCallbackService implements Processor {
 			return 404;
 		}
 		// process answer
-		double amount = (double) response.getValue("amount");
+		double amount = (double) response.getValue(LbSoapService.FIELD_AMOUNT);
 
 		if (operation.equalsIgnoreCase("deposited")) {
 			// do confirm payment
@@ -54,22 +92,7 @@ public class SberCallbackService implements Processor {
 			}
 			// processing fault message
 			if (response.isFault()) {
-				String fault = (String) response.getBody();
-				if (fault.matches(".*not found.*")) {
-					LOG.error(EMAIL_ALERT, "Account not found:{}", fault);
-					return 404;
-				}
-				if (fault.matches(".*is cancelled \\(record_id = (\\d+)\\).*")) {
-					LOG.warn(EMAIL_ALERT, "Cancelled: {}", fault);
-					return 200;
-				}
-				if (fault.matches(".*already exists \\(record_id = (\\d+)\\).*")) {
-					LOG.warn(EMAIL_ALERT, "Payment duplicate: {}", fault);
-					return 200;
-				}
-				// unknown fault
-				LOG.error(EMAIL_ALERT, "Server return fault response: {}", fault);
-				return 500;
+				return processFaultResponse((String) response.getBody());
 			}
 
 			// no response or internal error
@@ -78,32 +101,18 @@ public class SberCallbackService implements Processor {
 		}
 
 		// process refund and return
-		if (response.getValue("paymentid") != null && (Long) response.getValue("paymentid") != 0
-				&& response.getValue("receipt") != null) {
+		if (response.getValue(LbSoapService.FIELD_PAYMENT_ID) != null
+				&& response.getLong(LbSoapService.FIELD_PAYMENT_ID) != 0
+				&& response.getValue(LbSoapService.FIELD_RECEIPT) != null) {
 			// try cancel payment
-			response = lbapi.cancelPayment(response.getValue("receipt").toString());
+			response = lbapi.cancelPayment(response.getString(LbSoapService.FIELD_RECEIPT));
 			if (response.isSuccess()) {
 				// payment success confirmed
 				LOG.info(EMAIL_ALERT, "Processed refund payment orderNumber:{} on amount:{}", orderNumber, amount);
 				return 200;
 			}
 			if (response.isFault()) {
-				String fault = (String) response.getBody();
-				if (fault.matches(".*not found.*")) {
-					LOG.error(EMAIL_ALERT, "Payment not found:{}", fault);
-					return 404;
-				}
-				if (fault.matches(".*cannot be cancelled.*")) {
-					LOG.warn(EMAIL_ALERT, "Payment cannot be cancelled: {}", fault);
-					return 500;
-				}
-				if (fault.matches(".*already cancelled \\(record_id = (\\d+)\\).*")) {
-					LOG.warn(EMAIL_ALERT, "Payment already cancelled: {}", fault);
-					return 200;
-				}
-				// unknown fault
-				LOG.error(EMAIL_ALERT, "Server fault response: {}", fault);
-				return 500;
+				return processFaultResponse((String) response.getBody());
 			}
 			// no response or internal error
 			LOG.error(EMAIL_ALERT, "Internal Server error");
@@ -123,52 +132,39 @@ public class SberCallbackService implements Processor {
 	private int doProcessUnsuccess(String operation, Long orderNumber) {
 		LOG.info("Processing unsuccessful status for orderNumber:{} with operation:{}", orderNumber, operation);
 		ServiceResponse response = lbapi.cancelPrePayment(orderNumber);
-		if (!response.isSuccess()) {
-			LOG.error("Internal server errror or cannot cancel orderNumber:{}", orderNumber);
-		} else {
+		if (response.isSuccess()) {
 			LOG.warn("Deleted PrePayment record for orderNumber:{}", orderNumber);
+		} else if (response.isFault()) {
+			LOG.warn("Server response fault:{} for orderNumber:{}", response.getBody(), orderNumber);
+		} else {
+			LOG.error("Internal server errror or cannot cancel orderNumber:{}", orderNumber);
 		}
 		return 200;
 	}
 
-	protected int doProcess(int status, String operation, Long orderNumber, String receipt) {
-		if (status == 1)
-			return doProcessSuccess(operation, orderNumber, receipt);
-		if (status == 0)
-			return doProcessUnsuccess(operation, orderNumber);
-		// unsupported status
-		LOG.error("Received unknown status: {}", status);
-		return 404;
-	}
-
-	@Override
-	public void process(Exchange exchange) throws Exception {
-		Message message = exchange.getIn();
-		message.removeHeaders("Camel*");
-
-		// connect to LB
-		if (!lbapi.connect()) {
-			message.setHeader(Exchange.HTTP_RESPONSE_CODE, 503);
-			return;
+	private int processFaultResponse(String fault) {
+		if (fault.matches(".*not found.*")) {
+			LOG.error(EMAIL_ALERT, "Not found:{}", fault);
+			return 404;
 		}
-
-		// validate params
-		if (message.getHeader("status") == null 
-				|| message.getHeader("mdOrder") == null
-				|| message.getHeader("operation") == null
-				|| message.getHeader("orderNumber") == null) {
-			LOG.error("Params not found");
-			message.setHeader(Exchange.HTTP_RESPONSE_CODE, 400);
-			return;
+		if (fault.matches(".*is cancelled \\(record_id = (\\d+)\\).*")) {
+			LOG.warn(EMAIL_ALERT, "Cancelled: {}", fault);
+			return 200;
 		}
-
-		// process request and set response code
-		message.setHeader(Exchange.HTTP_RESPONSE_CODE,
-				doProcess(message.getHeader("status", Integer.class), message.getHeader("operation", String.class),
-						message.getHeader("orderNumber", Long.class), message.getHeader("mdOrder", String.class)));
-
-		// close connection
-		lbapi.disconnect();
+		if (fault.matches(".*already exists \\(record_id = (\\d+)\\).*")) {
+			LOG.warn(EMAIL_ALERT, "Payment duplicate: {}", fault);
+			return 200;
+		}
+		if (fault.matches(".*cannot be cancelled.*")) {
+			LOG.warn(EMAIL_ALERT, "Payment cannot be cancelled: {}", fault);
+			return 500;
+		}
+		if (fault.matches(".*already cancelled \\(record_id = (\\d+)\\).*")) {
+			LOG.warn(EMAIL_ALERT, "Payment already cancelled: {}", fault);
+			return 200;
+		}
+		LOG.error(EMAIL_ALERT, "Server return fault response: {}", fault);
+		return 500;
 	}
 
 }

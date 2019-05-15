@@ -123,7 +123,7 @@ public class FormCheckout {
 		}
 
 		// insert prepayment record
-		response = lbapi.insertPrePayment((long) response.getValue(account), amount);
+		response = lbapi.insertPrePayment(response.getLong(account), amount);
 		lbapi.disconnect();
 		if (!response.isSuccess()) {
 			LOG.error(EMAIL_ALERT,"Insert PrePayment error for UID:{}", account);
@@ -131,7 +131,7 @@ public class FormCheckout {
 			return;
 		}
 
-		final long orderNumber = (long) response.getValue("orderNumber");
+		final long orderNumber = response.getLong(LbSoapService.FIELD_ORDER_NUMBER);
 		LOG.info(EMAIL_ALERT,"Insert PrePayment orderNumber:{} on amount:{} for UID:{}", orderNumber, amount, account);
 
 		// prep query
