@@ -7,13 +7,16 @@ import org.openfs.lanbilling.LbSoapService;
 import org.openfs.lanbilling.LbSoapService.ServiceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component("sberCallback")
 public class SberCallbackService implements Processor {
 	private static final Logger LOG = LoggerFactory.getLogger(SberCallbackService.class);
-	
+	private static final Marker EMAIL_ALERT = MarkerFactory.getMarker("EMAIL_ALERT");
+
 	@Autowired
 	LbSoapService lbapi;
 
@@ -28,14 +31,14 @@ public class SberCallbackService implements Processor {
 		}
 
 		if (!operation.matches("deposited|reversed|refunded")) {
-			LOG.error("Received unknown operation:{}", operation);
+			LOG.error(EMAIL_ALERT, "Received unknown operation:{}", operation);
 			return 404;
 		}
 
 		// find payment record
 		ServiceResponse response = lbapi.getPrePayment(orderNumber);
 		if (!response.isSuccess()) {
-			LOG.error("PrePayment not found for orderNumber:{}", orderNumber);
+			LOG.error(EMAIL_ALERT, "PrePayment not found for orderNumber:{}", orderNumber);
 			return 404;
 		}
 		// process answer
@@ -46,31 +49,31 @@ public class SberCallbackService implements Processor {
 			response = lbapi.confirmPrePayment(orderNumber, amount, receipt);
 			if (response.isSuccess()) {
 				// payment success confirmed
-				LOG.info("Processed payment orderNumber:{} on amount:{}", orderNumber, amount);
+				LOG.info(EMAIL_ALERT, "Processed payment orderNumber:{} on amount:{}", orderNumber, amount);
 				return 200;
 			}
 			// processing fault message
 			if (response.isFault()) {
 				String fault = (String) response.getBody();
 				if (fault.matches(".*not found.*")) {
-					LOG.error("Account not found:{}", fault);
+					LOG.error(EMAIL_ALERT, "Account not found:{}", fault);
 					return 404;
 				}
 				if (fault.matches(".*is cancelled \\(record_id = (\\d+)\\).*")) {
-					LOG.warn("Cancelled: {}", fault);
+					LOG.warn(EMAIL_ALERT, "Cancelled: {}", fault);
 					return 200;
 				}
 				if (fault.matches(".*already exists \\(record_id = (\\d+)\\).*")) {
-					LOG.warn("Payment duplicate: {}", fault);
+					LOG.warn(EMAIL_ALERT, "Payment duplicate: {}", fault);
 					return 200;
 				}
 				// unknown fault
-				LOG.error("Server return fault response: {}", fault);
+				LOG.error(EMAIL_ALERT, "Server return fault response: {}", fault);
 				return 500;
 			}
 
 			// no response or internal error
-			LOG.error("Internal Server error");
+			LOG.error(EMAIL_ALERT, "Internal Server error");
 			return 500;
 		}
 
@@ -81,29 +84,29 @@ public class SberCallbackService implements Processor {
 			response = lbapi.cancelPayment(response.getValue("receipt").toString());
 			if (response.isSuccess()) {
 				// payment success confirmed
-				LOG.info("Processed refund payment orderNumber:{} on amount:{}", orderNumber, amount);
+				LOG.info(EMAIL_ALERT, "Processed refund payment orderNumber:{} on amount:{}", orderNumber, amount);
 				return 200;
 			}
 			if (response.isFault()) {
 				String fault = (String) response.getBody();
 				if (fault.matches(".*not found.*")) {
-					LOG.error("Payment not found:{}", fault);
+					LOG.error(EMAIL_ALERT, "Payment not found:{}", fault);
 					return 404;
 				}
 				if (fault.matches(".*cannot be cancelled.*")) {
-					LOG.warn("Payment cannot be cancelled: {}", fault);
+					LOG.warn(EMAIL_ALERT, "Payment cannot be cancelled: {}", fault);
 					return 500;
 				}
 				if (fault.matches(".*already cancelled \\(record_id = (\\d+)\\).*")) {
-					LOG.warn("Payment already cancelled: {}", fault);
+					LOG.warn(EMAIL_ALERT, "Payment already cancelled: {}", fault);
 					return 200;
 				}
 				// unknown fault
-				LOG.error("Server fault response: {}", fault);
+				LOG.error(EMAIL_ALERT, "Server fault response: {}", fault);
 				return 500;
 			}
 			// no response or internal error
-			LOG.error("Internal Server error");
+			LOG.error(EMAIL_ALERT, "Internal Server error");
 			return 500;
 		}
 
@@ -150,8 +153,10 @@ public class SberCallbackService implements Processor {
 		}
 
 		// validate params
-		if (message.getHeader("status") == null || message.getHeader("mdOrder") == null
-				|| message.getHeader("operation") == null || message.getHeader("orderNumber") == null) {
+		if (message.getHeader("status") == null 
+				|| message.getHeader("mdOrder") == null
+				|| message.getHeader("operation") == null
+				|| message.getHeader("orderNumber") == null) {
 			LOG.error("Params not found");
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, 400);
 			return;

@@ -16,6 +16,8 @@ import org.openfs.lanbilling.LbSoapService.CodeExternType;
 import org.openfs.lanbilling.LbSoapService.ServiceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.Marker;
+import org.slf4j.MarkerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +27,7 @@ import org.springframework.stereotype.Component;
 @Configuration
 public class FormCheckout {
 	private static final Logger LOG = LoggerFactory.getLogger(FormCheckout.class);
+	private static final Marker EMAIL_ALERT = MarkerFactory.getMarker("EMAIL_ALERT");
 	private static Pattern NUMBERS = Pattern.compile("\\d+");
 
 	@Autowired
@@ -58,7 +61,7 @@ public class FormCheckout {
 
 			// validate format
 			if (!NUMBERS.matcher(account).matches()) {
-				LOG.warn("UID:{} has bad format", account);
+				LOG.error("UID:{} has bad format", account);
 				message.setHeader(Exchange.HTTP_RESPONSE_CODE, 404);
 				return;
 			}
@@ -123,13 +126,13 @@ public class FormCheckout {
 		response = lbapi.insertPrePayment((long) response.getValue(account), amount);
 		lbapi.disconnect();
 		if (!response.isSuccess()) {
-			LOG.error("Insert PrePayment error for UID:{}", account);
+			LOG.error(EMAIL_ALERT,"Insert PrePayment error for UID:{}", account);
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, 500);
 			return;
 		}
 
 		final long orderNumber = (long) response.getValue("orderNumber");
-		LOG.info("Insert PrePayment orderNumber:{} on amount:{} for UID:{}", orderNumber, amount, account);
+		LOG.info(EMAIL_ALERT,"Insert PrePayment orderNumber:{} on amount:{} for UID:{}", orderNumber, amount, account);
 
 		// prep query
 		StringBuilder sb = new StringBuilder();
@@ -151,7 +154,7 @@ public class FormCheckout {
 			Object answer = producer.requestBodyAndHeader(null, Exchange.HTTP_QUERY,
 					URLEncoder.encode(sb.toString(), "UTF-8"));
 			if (answer == null) {
-				LOG.error("Call to Sber has no response");
+				LOG.error(EMAIL_ALERT,"Call to Sber has no response");
 				message.setHeader(Exchange.HTTP_RESPONSE_CODE, 500);
 				return;
 			}
@@ -160,7 +163,7 @@ public class FormCheckout {
 				Map<String, String> sberResponse = (Map<String, String>) answer;
 				// process if error
 				if (sberResponse.containsKey("errorCode")) {
-					LOG.error("Sber return error:{}", sberResponse.get("errorMessage"));
+					LOG.error(EMAIL_ALERT,"Sber return error:{}", sberResponse.get("errorMessage"));
 					message.setHeader(Exchange.HTTP_RESPONSE_CODE, 500);
 					return;
 				}
@@ -172,11 +175,11 @@ public class FormCheckout {
 				}
 			}
 		} catch (CamelExecutionException e) {
-			LOG.error("Call to Sber got exception:{}", e.getMessage());
+			LOG.error(EMAIL_ALERT,"Call to Sber got exception:{}", e.getMessage());
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, 500);
 			return;
 		} catch (UnsupportedEncodingException e) {
-			LOG.error("Call to Sber got URL exception:{}", e.getMessage());
+			LOG.error(EMAIL_ALERT,"Call to Sber got URL exception:{}", e.getMessage());
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, 500);
 			return;
 		}
