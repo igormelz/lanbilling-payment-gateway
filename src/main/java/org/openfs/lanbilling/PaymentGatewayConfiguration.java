@@ -29,38 +29,57 @@ public class PaymentGatewayConfiguration extends RouteBuilder {
 		restConfiguration().component("servlet").contextPath("/pay").dataFormatProperty(
 				"com.fasterxml.jackson.databind.SerializationFeature.disableFeatures", "WRITE_NULL_MAP_VALUES");
 
-		rest("/sber/online").bindingMode(RestBindingMode.xml).consumes("application/xml").produces("application/xml")
-				.get().id("SberOnlineRestApi").param().name("ACTION").type(RestParamType.query).dataType("string")
-				.endParam().param().name("ACCOUNT").type(RestParamType.query).dataType("string").endParam().param()
-				.name("AMOUNT").type(RestParamType.query).dataType("string").endParam().param().name("PAY_ID")
-				.type(RestParamType.query).dataType("string").endParam().param().name("PAY_DATE")
-				.type(RestParamType.query).dataType("string").endParam().outType(SberOnlineResponse.class)
-				.to("direct:processOnline");
+		rest("/sber/online").bindingMode(RestBindingMode.xml)
+			.consumes("application/xml")
+			.produces("application/xml")
+			.get().id("SberOnlineRestApi")
+				.param().name("ACTION").type(RestParamType.query).dataType("string").endParam()
+				.param().name("ACCOUNT").type(RestParamType.query).dataType("string").endParam()
+				.param().name("AMOUNT").type(RestParamType.query).dataType("string").endParam()
+				.param().name("PAY_ID").type(RestParamType.query).dataType("string").endParam()
+				.param().name("PAY_DATE").type(RestParamType.query).dataType("string").endParam()
+				.outType(SberOnlineResponse.class)
+				.route()
+					.routeId("ProcessSberOnline")
+					.log("REQ: ${headers}")
+					.process("sberOnline")
+				.endRest();
 
-		rest("/sber/callback").bindingMode(RestBindingMode.off).get().id("SberCallback").param().name("mdOrder")
-				.type(RestParamType.query).dataType("string").endParam().param().name("orderNumber")
-				.type(RestParamType.query).dataType("string").endParam().param().name("checksum")
-				.type(RestParamType.query).dataType("string").endParam().param().name("operation")
-				.type(RestParamType.query).dataType("string").endParam().param().name("status")
-				.type(RestParamType.query).dataType("integer").endParam().to("direct:processCallback");
+		rest("/sber/callback").bindingMode(RestBindingMode.off)
+			.get().id("SberCallback")
+				.param().name("mdOrder").type(RestParamType.query).dataType("string").endParam()
+				.param().name("orderNumber").type(RestParamType.query).dataType("string").endParam()
+				.param().name("checksum").type(RestParamType.query).dataType("string").endParam()
+				.param().name("operation").type(RestParamType.query).dataType("string").endParam()
+				.param().name("status").type(RestParamType.query).dataType("integer").endParam()
+				.route()
+					.routeId("ProcessSberCallback")
+					.log("REQ: ${headers}")
+					.setExchangePattern(ExchangePattern.InOnly)
+					.process("sberCallback")
+				.endRest();
 
-		rest("/checkout").enableCORS(true).bindingMode(RestBindingMode.off).produces("application/json")
-				.id("FormCheckout").get().description("validate account").param().name("uid").type(RestParamType.query)
-				.dataType("string").endParam().param().name("phone").type(RestParamType.query).dataType("string")
-				.endParam().param().name("email").type(RestParamType.query).dataType("string").endParam().route()
-				.routeId("ProcessFormCheckout").log("REQ: ${headers}").bean("formCheckout", "validate").endRest().post()
-				.description("checkout prepayment").param().name("uid").dataType("string").endParam().param()
-				.name("amount").dataType("string").endParam().route().routeId("ProcessPrePayment")
-				.log("REQ: ${headers}").bean("formCheckout", "checkout").endRest();
+		rest("/checkout").enableCORS(true).bindingMode(RestBindingMode.off)
+			.id("FormCheckout")
+			.get().description("validate account")
+				.param().name("uid").type(RestParamType.query).dataType("string").endParam()
+				.param().name("phone").type(RestParamType.query).dataType("string").endParam()
+				.param().name("email").type(RestParamType.query).dataType("string").endParam()
+				.route()
+					.routeId("ProcessFormCheckout")
+					.log("REQ: ${headers}")
+					.bean("formCheckout", "validate")
+				.endRest()
+			.post().description("checkout prepayment")
+				.param().name("uid").dataType("string").endParam()
+				.param().name("amount").dataType("string").endParam()
+				.route()
+					.routeId("ProcessPrePayment")
+					.log("REQ: ${headers}")
+					.bean("formCheckout", "checkout")
+				.endRest();
 
-		// service process online api
-		from("direct:processOnline").id("ProcessOnline").log("REQ: ${headers}").process("sberOnline");
-
-		// service process rest callback api
-		from("direct:processCallback").id("ProcessCallback").log("REQ: ${headers}")
-				.setExchangePattern(ExchangePattern.InOnly).process("sberCallback");
-
-		// SOAP backend
+		// LanBilling SOAP service
 		from("direct:lbsoap").id("LanBillingSoapBackend").onException(SOAPFaultException.class).handled(true)
 				.log("EXCEPTION:${body}").end().marshal(lbsoap).setHeader(Exchange.HTTP_METHOD).constant("POST")
 				.to("undertow:http://{{backend}}?throwExceptionOnFailure=false&cookieHandler=#cookieHandler").filter()
