@@ -13,12 +13,12 @@ import org.springframework.stereotype.Component;
 @Component("sberCallback")
 public class SberCallbackService implements Processor {
 	private static final Logger LOG = LoggerFactory.getLogger(SberCallbackService.class);
-
+	
 	@Autowired
 	LbSoapService lbapi;
 
 	private int doProcessSuccess(String operation, Long orderNumber, String receipt) {
-		LOG.info("Process successful status for orderNumber:{}, operation:{}, receipt:{}", orderNumber, operation,
+		LOG.info("Processing successful status for orderNumber:{}, operation:{}, receipt:{}", orderNumber, operation,
 				receipt);
 
 		// process by operation code
@@ -106,7 +106,7 @@ public class SberCallbackService implements Processor {
 			LOG.error("Internal Server error");
 			return 500;
 		}
-		
+
 		// payment not confirmed - try to delete prepayment record
 		response = lbapi.cancelPrePayment(orderNumber);
 		if (!response.isSuccess()) {
@@ -118,17 +118,13 @@ public class SberCallbackService implements Processor {
 	}
 
 	private int doProcessUnsuccess(String operation, Long orderNumber) {
-		LOG.info("Process unsuccessful status for orderNumber:{} with operation:{}", orderNumber, operation);
-		if (operation.startsWith("declined")) {
-			ServiceResponse response = lbapi.cancelPrePayment(orderNumber);
-			if (!response.isSuccess()) {
-				LOG.error("Internal server errror or cannot cancel orderNumber:{}", orderNumber);
-				return 200;
-			}
+		LOG.info("Processing unsuccessful status for orderNumber:{} with operation:{}", orderNumber, operation);
+		ServiceResponse response = lbapi.cancelPrePayment(orderNumber);
+		if (!response.isSuccess()) {
+			LOG.error("Internal server errror or cannot cancel orderNumber:{}", orderNumber);
+		} else {
 			LOG.warn("Deleted PrePayment record for orderNumber:{}", orderNumber);
-			return 200;
 		}
-		LOG.warn("Operation unknown for orderNumber:{}", orderNumber);
 		return 200;
 	}
 
@@ -169,4 +165,5 @@ public class SberCallbackService implements Processor {
 		// close connection
 		lbapi.disconnect();
 	}
+
 }
