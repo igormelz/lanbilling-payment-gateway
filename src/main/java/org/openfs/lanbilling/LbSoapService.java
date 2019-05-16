@@ -54,14 +54,17 @@ public class LbSoapService {
 	public static final String FIELD_RECEIPT = "receipt";
 	public static final String FIELD_PAYMENT_ID = "paymentId";
 	public static final String FIELD_ORDER_NUMBER = "orderNumber";
+	public static final String FIELD_PREPAYMENT_PAY_DATE = "prepaymentDate";
+	public static final String FIELD_PREPAYMENT_STATUS = "prepaymentStatus";
+	public static final String FIELD_PREPAYMENT_CANCEL_DATE = "prepaymentCancelDate";
 	
 	@EndpointInject(uri = "direct:lbsoap")
 	ProducerTemplate producer;
 
-	@Value("${manager.name}")
+	@Value("${lbcore.username}")
 	private String name;
 
-	@Value("${manager.pwd}")
+	@Value("${lbcore.password}")
 	private String pwd;
 
 	private Login login;
@@ -237,6 +240,9 @@ public class LbSoapService {
 			values.put(FIELD_AMOUNT, answer.getRet().get(0).getAmount());
 			values.put(FIELD_PAYMENT_ID, answer.getRet().get(0).getPaymentid());
 			values.put(FIELD_RECEIPT, answer.getRet().get(0).getReceipt());
+			values.put(FIELD_PREPAYMENT_PAY_DATE, answer.getRet().get(0).getPaydate());
+			values.put(FIELD_PREPAYMENT_CANCEL_DATE, answer.getRet().get(0).getCanceldate());
+			values.put(FIELD_PREPAYMENT_STATUS,answer.getRet().get(0).getStatus());
 			return new ServiceResponse(response.getStatus(), values);
 		}
 		return response;
