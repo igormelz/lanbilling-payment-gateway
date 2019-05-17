@@ -16,8 +16,6 @@ import org.openfs.lanbilling.LbSoapService.CodeExternType;
 import org.openfs.lanbilling.LbSoapService.ServiceResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.Marker;
-import org.slf4j.MarkerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -29,7 +27,6 @@ import io.undertow.util.StatusCodes;
 @Configuration
 public class FormCheckout {
 	private static final Logger LOG = LoggerFactory.getLogger(FormCheckout.class);
-	private static final Marker EMAIL_ALERT = MarkerFactory.getMarker("EMAIL_ALERT");
 	private static Pattern NUMBERS = Pattern.compile("\\d+");
 
 	@Autowired
@@ -64,8 +61,8 @@ public class FormCheckout {
 
 			// validate format
 			if (!NUMBERS.matcher(account).matches()) {
-				LOG.error("UID:{} has bad format", account);
-				message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.NOT_FOUND);
+				LOG.error("uid:{} has bad format", account);
+				message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.NOT_ACCEPTABLE);
 				return;
 			}
 
@@ -137,7 +134,7 @@ public class FormCheckout {
 		}
 
 		final long orderNumber = response.getLong(LbSoapService.FIELD_ORDER_NUMBER);
-		LOG.info("Create prepayment orderNumber:{}, amount:{}, uid:{}", orderNumber, amount, account);
+		LOG.info("Processing sberbank acquiring for orderNumber:{}, amount:{}, uid:{}", orderNumber, amount, account);
 
 		// Processing sberbank acquiring
 		StringBuilder sb = new StringBuilder();
@@ -153,7 +150,7 @@ public class FormCheckout {
 			Object answer = producer.requestBodyAndHeader(null, Exchange.HTTP_QUERY,
 					URLEncoder.encode(sb.toString(), "UTF-8"));
 			if (answer == null) {
-				LOG.error(EMAIL_ALERT, "Call to Sber has no response");
+				LOG.error("Sber has no response");
 				message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.INTERNAL_SERVER_ERROR);
 				return;
 			}
@@ -162,7 +159,7 @@ public class FormCheckout {
 				Map<String, String> sberResponse = (Map<String, String>) answer;
 				// process if error
 				if (sberResponse.containsKey("errorCode")) {
-					LOG.error(EMAIL_ALERT, "Sber return error:{}", sberResponse.get("errorMessage"));
+					LOG.error("Sber return error:{}", sberResponse.get("errorMessage"));
 					message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.INTERNAL_SERVER_ERROR);
 					return;
 				}
@@ -175,11 +172,11 @@ public class FormCheckout {
 				}
 			}
 		} catch (CamelExecutionException e) {
-			LOG.error("Call to Sber got exception:{}", e.getMessage());
+			LOG.error("Sber got exception:{}", e.getMessage());
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.INTERNAL_SERVER_ERROR);
 			return;
 		} catch (UnsupportedEncodingException e) {
-			LOG.error("Call to Sber got URL exception:{}", e.getMessage());
+			LOG.error("Sber got URL exception:{}", e.getMessage());
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.INTERNAL_SERVER_ERROR);
 			return;
 		}
