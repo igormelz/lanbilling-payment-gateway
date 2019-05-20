@@ -34,19 +34,25 @@ public class PaymentGatewayConfiguration extends RouteBuilder {
 		rest("/sber/callback").bindingMode(RestBindingMode.off).get().route().routeId("ProcessSberCallback")
 				.setExchangePattern(ExchangePattern.InOnly).process("sberCallback").endRest();
 
-		rest("/checkout").enableCORS(true).bindingMode(RestBindingMode.off).produces("application/json").get().route().routeId("ProcessFormValidate")
-				.setExchangePattern(ExchangePattern.InOnly).bean("formCheckout", "validate").endRest().post().route()
-				.routeId("ProcessFormCheckout").setExchangePattern(ExchangePattern.InOnly)
-				.bean("formCheckout", "checkout").endRest();
+		rest("/checkout").enableCORS(true).bindingMode(RestBindingMode.off).produces("application/json").get().route()
+				.routeId("ProcessFormValidate").setExchangePattern(ExchangePattern.InOnly)
+				.bean("formCheckout", "validate").endRest().post().route().routeId("ProcessFormCheckout")
+				.setExchangePattern(ExchangePattern.InOnly).bean("formCheckout", "checkout").endRest();
 
-		// LanBilling SOAP service
+		rest("/form").enableCORS(true).bindingMode(RestBindingMode.off)
+				// validate form fields
+				.get("/validate").route().routeId("FormValidator").process("formValidate").endRest()
+		// .post("/checkout").route().routeId("FormCheckout")
+		;
+
+		// LanBilling SOAP backend service endpoint
 		from("direct:lbsoap").id("LBcoreSoapBackend").onException(SOAPFaultException.class).handled(true)
 				.log("LBCORE EXCEPTION:${body}").end().marshal(lbsoap).setHeader(Exchange.HTTP_METHOD).constant("POST")
 				.to("undertow:http://{{lbcore}}?throwExceptionOnFailure=false&cookieHandler=#cookieHandler").filter()
 				.simple("${header.CamelHttpResponseCode} != 200").transform().xpath("//detail/text()", String.class)
 				.end().filter().simple("${header.CamelHttpResponseCode} == 200").unmarshal(lbsoap).end();
 
-		// Sberbank card payment service
+		// Sberbank card payment backend service endpoint
 		from("direct:sberbank").id("SberbankBackend").setHeader(Exchange.CONTENT_TYPE)
 				.constant("application/x-www-form-urlencoded").setHeader(Exchange.HTTP_METHOD).constant("POST")
 				.to("undertow:{{sber.Url}}?throwExceptionOnFailure=false&sslContextParameters=#sslContext").unmarshal()
