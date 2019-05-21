@@ -31,19 +31,26 @@ public class PaymentGatewayConfiguration extends RouteBuilder {
 //				.get().outType(SberOnlineResponse.class).route().routeId("ProcessSberOnline").process("sberOnline")
 //				.endRest();
 
+		// SberBank Callback endpoint
 		rest("/sber/callback").bindingMode(RestBindingMode.off).get().route().routeId("ProcessSberCallback")
 				.setExchangePattern(ExchangePattern.InOnly).process("sberCallback").endRest();
 
+		// form payment v1 endpoint
 		rest("/checkout").enableCORS(true).bindingMode(RestBindingMode.off).produces("application/json").get().route()
 				.routeId("ProcessFormValidate").setExchangePattern(ExchangePattern.InOnly)
 				.bean("formCheckout", "validate").endRest().post().route().routeId("ProcessFormCheckout")
 				.setExchangePattern(ExchangePattern.InOnly).bean("formCheckout", "checkout").endRest();
 
+		// form payment v2 endpoint
 		rest("/form").enableCORS(true).bindingMode(RestBindingMode.off)
-				// validate form fields
+				// validate form fields 
 				.get("/validate").route().routeId("FormValidator").process("formValidate").endRest()
 		// .post("/checkout").route().routeId("FormCheckout")
 		;
+
+		// Dreamkas Webhook callback endpoint
+		rest("/dreamkas").bindingMode(RestBindingMode.off)
+				.post().route().routeId("ProcessDreamkasCallback").log("REQ:${body}").endRest();
 
 		// LanBilling SOAP backend service endpoint
 		from("direct:lbsoap").id("LBcoreSoapBackend").onException(SOAPFaultException.class).handled(true)
@@ -57,6 +64,14 @@ public class PaymentGatewayConfiguration extends RouteBuilder {
 				.constant("application/x-www-form-urlencoded").setHeader(Exchange.HTTP_METHOD).constant("POST")
 				.to("undertow:{{sber.Url}}?throwExceptionOnFailure=false&sslContextParameters=#sslContext").unmarshal()
 				.json(JsonLibrary.Fastjson, Map.class);
+
+		// Dreamkas Receipts Backend endpoint
+		from("direct:dreamkas").id("DreamkasReceiptsBackend").setHeader(Exchange.HTTP_METHOD).constant("POST")
+				.setHeader(Exchange.CONTENT_TYPE).constant("application/json; charset=utf-8")
+				.marshal().json(JsonLibrary.Fastjson)
+				.log("REQ: ${body}");
+//				.to("undertow:https://kabinet.dreamkas.ru/api/receipts?throwExceptionOnFailure=false&sslContextParameters=#sslContext")
+//				.unmarshal().json(JsonLibrary.Fastjson, Map.class).log("RES:${body}");
 
 	}
 
