@@ -1,36 +1,56 @@
 package org.openfs.lanbilling.dreamkas;
 
+import java.util.Map;
+
 import org.apache.camel.Exchange;
+import org.apache.camel.Message;
 import org.apache.camel.Processor;
+import org.openfs.lanbilling.dreamkas.model.Operation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+
+import com.alibaba.fastjson.JSON;
+
+import io.undertow.util.StatusCodes;
 
 @Component("dreamkasCallback")
 public class DreamkasCallbackService implements Processor {
+	private static final Logger LOG = LoggerFactory.getLogger(DreamkasCallbackService.class);
+	private static final String TYPE_PRODUCT = "PRODUCT";
+	private static final String TYPE_SHIFT = "SHIFT";
+	private static final String TYPE_RECEIPT = "RECEIPT";
+	private static final String TYPE_DEVICE = "DEVICE";
+	private static final String TYPE_OPERATION = "OPERATION";
+	private static final String TYPE_ENCASHMENT = "ENCASHMENT";
 
 	/**
-	 * Process webhook callback with following parameters: <br>
-	 * <b>action</b> - enum of CREATE, UPDATE, DELETE<br>
-	 * <b>type</b> - enum of PRODUCT, DEVICE, ENCASHMENT, SHIFT, RECEIPT,
-	 * OPERATION<br>
-	 * <b>data</b> - object as id (string),<br>
-	 * name (string)<br>
-	 * type enum of COUNTABLE, SCALABLE, ALCOHOL, CLOTHES, SHOES, SERVICE,
-	 * TOBACCO,<br>
-	 * departmentId (number),<br>
-	 * quantity (number),<br>
-	 * prices array of { deviceId (number), value (number) },<br>
-	 * price ( number),<br>
-	 * meta (enum),<br>
-	 * barcodes (array of string),<br>
-	 * vendorCodes - array of string,<br>
-	 * tax - NDS_NO_TAX, NDS_0, NDS_10, NDS_20, NDS_10_CALCULATED,
-	 * NDS_20_CALCULATED,<br>
-	 * createdAt - iso string datetime,<br>
-	 * updatedAt string iso string datetime
+	 * Process webhook callback.
 	 */
 	@Override
 	public void process(Exchange exchange) throws Exception {
-		// TODO Auto-generated method stub
+		Message message = exchange.getIn();
+		message.removeHeaders("Camel.*");
+		@SuppressWarnings("unchecked")
+		Map<String, Object> body = message.getBody(Map.class);
+		LOG.info("Processing callback action:{}, type:{}", body.get("action"), body.get("type"));
+
+		if (body.get("type").toString().equalsIgnoreCase(TYPE_OPERATION)) {
+			Operation operation = JSON.parseObject(body.get("data").toString(), Operation.class);
+			if (operation.getStatus().equalsIgnoreCase(Operation.ERROR) && operation.getData() != null) {
+				LOG.error("Operation id:{} type:{} -- {}", operation.getId(), operation.getType(),
+						operation.getData().getError().getCode());
+			} else {
+				LOG.info("Operation id:{}, type:{}, status:{}", operation.getId(), operation.getType(),
+						operation.getStatus());
+			}
+		} else {
+			LOG.info("Unparsing callback data:{}", body.get("data"));
+		}
+
+		// response OK with null body
+		message.setBody(null);
+		message.setHeader(exchange.HTTP_RESPONSE_CODE, StatusCodes.ACCEPTED);
 	}
 
 }

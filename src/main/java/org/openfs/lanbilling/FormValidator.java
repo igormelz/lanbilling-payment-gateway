@@ -58,7 +58,6 @@ public class FormValidator implements Processor {
 	public void process(Exchange exchange) throws Exception {
 		Message message = exchange.getIn();
 		message.removeHeaders("Camel*");
-		//message.setBody("{}");
 
 		// userid
 		if (message.getHeader("uid") != null && !message.getHeader("uid", String.class).isEmpty()) {

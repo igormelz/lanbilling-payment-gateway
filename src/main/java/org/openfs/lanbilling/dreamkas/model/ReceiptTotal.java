@@ -1,13 +1,13 @@
 package org.openfs.lanbilling.dreamkas.model;
 
 public class ReceiptTotal {
-	private final int priceSum;
+	private final long priceSum;
 
-	public ReceiptTotal(int priceSum) {
+	public ReceiptTotal(long priceSum) {
 		this.priceSum = priceSum;
 	}
 
-	public int getPriceSum() {
+	public long getPriceSum() {
 		return priceSum;
 	}
 }

@@ -11,16 +11,16 @@ import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
 public class PaymentGatewayApplication {
-		
+
 	@Bean
 	CookieHandler cookieHandler() {
 		return new InstanceCookieHandler();
 	}
-	
+
 	@Bean
 	SSLContextParameters sslContext() {
 		KeyStoreParameters ksp = new KeyStoreParameters();
-		ksp.setResource("classpath:keystore.jks");
+		ksp.setResource("classpath:ssl/keystore.jks");
 		ksp.setPassword("keystorePassword");
 
 		KeyManagersParameters kmp = new KeyManagersParameters();
@@ -36,4 +36,3 @@ public class PaymentGatewayApplication {
 	}
 
 }
-

@@ -45,19 +45,24 @@ public class LbSoapService {
 	private static final Logger LOG = LoggerFactory.getLogger(LbSoapService.class);
 	private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
-	public static final String FIELD_NAME = "name";
-	public static final String FIELD_PHONE = "phone";
-	public static final String FIELD_EMAIL = "email";
-	public static final String FIELD_UID = "uid";
-	public static final String FIELD_AMOUNT = "amount";
-	public static final String FIELD_AGREEMENT_ID = "agrmId";
-	public static final String FIELD_RECEIPT = "receipt";
-	public static final String FIELD_PAYMENT_ID = "paymentId";
-	public static final String FIELD_ORDER_NUMBER = "orderNumber";
-	public static final String FIELD_PREPAYMENT_PAY_DATE = "prepaymentDate";
-	public static final String FIELD_PREPAYMENT_STATUS = "prepaymentStatus";
-	public static final String FIELD_PREPAYMENT_CANCEL_DATE = "prepaymentCancelDate";
-	
+	public static final String NAME = "name";
+	public static final String PHONE = "phone";
+	public static final String EMAIL = "email";
+	public static final String USER_ID = "uid";
+	public static final String AMOUNT = "amount";
+	public static final String AGREEMENT_ID = "agrmId";
+	public static final String RECEIPT = "receipt";
+	public static final String PAYMENT_ID = "paymentId";
+	public static final String ORDER_NUMBER = "orderNumber";
+	public static final String TOTAL_BALANCE = "TOTAL_BALANCE";
+	public static final String PREPAYMENT_PAY_DATE = "prepaymentDate";
+	public static final String PREPAYMENT_STATUS = "prepaymentStatus";
+	public static final String PREPAYMENT_CANCEL_DATE = "prepaymentCancelDate";
+
+	public static final long STATUS_READY = 0;
+	public static final long STATUS_PROCESSED = 1;
+	public static final long STATUS_CANCELED = 2;
+
 	@EndpointInject(uri = "direct:lbsoap")
 	ProducerTemplate producer;
 
@@ -109,7 +114,7 @@ public class LbSoapService {
 		data.setAgrmid(agreementId);
 		data.setAmount(amount);
 		data.setCurname("RUR");
-		data.setComment("checkout");
+		data.setComment("form checkout");
 		data.setPaydate(sdf.format(new Date()));
 
 		// insert pre-payment
@@ -119,7 +124,7 @@ public class LbSoapService {
 		if (response.getStatus() == ServiceResponseStatus.SUCCESS) {
 			// parse response
 			InsPrePaymentResponse answer = (InsPrePaymentResponse) response.getBody();
-			return new ServiceResponse(response.getStatus(), Collections.singletonMap(FIELD_ORDER_NUMBER, answer.getRet()));
+			return new ServiceResponse(response.getStatus(), Collections.singletonMap(ORDER_NUMBER, answer.getRet()));
 		}
 		return response;
 	}
@@ -137,10 +142,10 @@ public class LbSoapService {
 				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
 			HashMap<String, Object> values = new HashMap<String, Object>();
-			values.put(FIELD_NAME, answer.getRet().get(0).getAccount().getName());
-			values.put(FIELD_PHONE, answer.getRet().get(0).getAccount().getMobile());
-			values.put(FIELD_EMAIL, answer.getRet().get(0).getAccount().getEmail());
-			values.put(FIELD_UID, answer.getRet().get(0).getAccount().getUid());
+			values.put(NAME, answer.getRet().get(0).getAccount().getName());
+			values.put(PHONE, answer.getRet().get(0).getAccount().getMobile());
+			values.put(EMAIL, answer.getRet().get(0).getAccount().getEmail());
+			values.put(USER_ID, answer.getRet().get(0).getAccount().getUid());
 			return new ServiceResponse(response.getStatus(), values);
 		}
 		return response;
@@ -159,7 +164,7 @@ public class LbSoapService {
 				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
 			return new ServiceResponse(response.getStatus(),
-					Collections.singletonMap(FIELD_AGREEMENT_ID, answer.getRet().get(0).getAgrmid()));
+					Collections.singletonMap(AGREEMENT_ID, answer.getRet().get(0).getAgrmid()));
 
 		}
 		return response;
@@ -197,11 +202,17 @@ public class LbSoapService {
 				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
 			SoapAccountFull account = answer.getRet().get(0);
-			// put contract number to contract id
+			// put agreement number -> agreement_id
 			Map<String, Object> values = account.getAgreements().stream()
 					.collect(Collectors.toMap(a -> a.getNumber(), a -> a.getAgrmid()));
 			// put account name
-			values.put(FIELD_NAME, account.getAccount().getName());
+			values.put(NAME, account.getAccount().getName());
+			values.put(EMAIL, account.getAccount().getEmail());
+			values.put(PHONE, account.getAccount().getMobile());
+			values.put(TOTAL_BALANCE,
+					account.getAgreements().stream().collect(Collectors.averagingDouble(a -> a.getBalance())));
+			// values.put(EMAIL_CONFIRMED, account.getAccount().isEmailisconfirmed());
+			// values.put(EMAIL, account.getAccount().isMobileisconfirmed());
 			return new ServiceResponse(response.getStatus(), values);
 		}
 		return response;
@@ -236,13 +247,14 @@ public class LbSoapService {
 				return new ServiceResponse(ServiceResponseStatus.EMPTY_RESPONSE, null);
 			}
 			HashMap<String, Object> values = new HashMap<String, Object>();
-			values.put(FIELD_AGREEMENT_ID, answer.getRet().get(0).getAgrmid());
-			values.put(FIELD_AMOUNT, answer.getRet().get(0).getAmount());
-			values.put(FIELD_PAYMENT_ID, answer.getRet().get(0).getPaymentid());
-			values.put(FIELD_RECEIPT, answer.getRet().get(0).getReceipt());
-			values.put(FIELD_PREPAYMENT_PAY_DATE, answer.getRet().get(0).getPaydate());
-			values.put(FIELD_PREPAYMENT_CANCEL_DATE, answer.getRet().get(0).getCanceldate());
-			values.put(FIELD_PREPAYMENT_STATUS,answer.getRet().get(0).getStatus());
+			values.put(ORDER_NUMBER, prepayid);
+			values.put(AGREEMENT_ID, answer.getRet().get(0).getAgrmid());
+			values.put(AMOUNT, answer.getRet().get(0).getAmount());
+			values.put(PAYMENT_ID, answer.getRet().get(0).getPaymentid());
+			values.put(RECEIPT, answer.getRet().get(0).getReceipt());
+			values.put(PREPAYMENT_PAY_DATE, answer.getRet().get(0).getPaydate());
+			values.put(PREPAYMENT_CANCEL_DATE, answer.getRet().get(0).getCanceldate());
+			values.put(PREPAYMENT_STATUS, answer.getRet().get(0).getStatus());
 			return new ServiceResponse(response.getStatus(), values);
 		}
 		return response;
@@ -355,15 +367,15 @@ public class LbSoapService {
 			}
 			return values.get(name);
 		}
-		
+
 		public Long getLong(String name) {
 			return getValue(name) != null ? (long) getValue(name) : null;
 		}
-		
+
 		public String getString(String name) {
 			return getValue(name) != null ? getValue(name).toString() : null;
 		}
-		
+
 	}
 
 }

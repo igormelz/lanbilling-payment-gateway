@@ -24,7 +24,7 @@ public class Receipt {
 	public final static String GOODS_SCALEABLE = "SCALEABLE";
 	public final static String GOODS_SHOES = "SHOES";
 	public final static String GOODS_CLOTHES = "CLOTHES";
-	public final static String GOODS_SERVICE = "SERVICE"; // by response 
+	public final static String GOODS_SERVICE = "SERVICE"; // by response
 	public final static String GOODS_TOBACCO = "TOBACCO";
 
 	public final static String NDS_NO_TAX = "NDS_NO_TAX";
@@ -42,7 +42,7 @@ public class Receipt {
 
 	private int deviceId;
 	private String type;
-	private int timeout = 5;
+	private int timeout;
 	private String taxMode;
 	private ReceiptPosition[] positions;
 	private ReceiptPayment[] payments;
@@ -122,21 +122,23 @@ public class Receipt {
 		this.total = total;
 	}
 
-	public static class Builder {
+	public static Builder builder(int deviceId, String taxmode) {
+		return new Builder(deviceId, taxmode);
+	}
+	
+	public static final class Builder {
 		private final int deviceId;
 		private final String taxMode;
-		private final List<ReceiptPosition> positions;
-		private final List<ReceiptPayment> payments;
+		private final List<ReceiptPosition> positions = new ArrayList<>();
+		private final List<ReceiptPayment> payments = new ArrayList<>();
 		private ReceiptAttributes attributes;
 
-		public Builder(int deviceId, String taxMode) {
+		Builder(final int deviceId, final String taxMode) {
 			this.deviceId = deviceId;
 			this.taxMode = taxMode;
-			this.positions = new ArrayList<ReceiptPosition>();
-			this.payments = new ArrayList<ReceiptPayment>();
 		}
 
-		public Builder addNoTaxServicePosition(String name, int price) {
+		public Builder addNoTaxServicePosition(String name, long price) {
 			ReceiptPosition pos = new ReceiptPosition(name);
 			pos.setType(GOODS_SERVICE);
 			pos.setQuantity(1);
@@ -162,17 +164,25 @@ public class Receipt {
 			return this;
 		}
 
-		public Builder addPhoneAttributes(String phone) {
-			ReceiptAttributes attr = new ReceiptAttributes();
-			attr.setPhone(phone);
-			this.attributes = attr;
+		public Builder addPhoneAttribute(final String phone) {
+			if (this.attributes == null) {
+				this.attributes = new ReceiptAttributes();
+			}
+			this.attributes.setPhone(phone);
+			return this;
+		}
+
+		public Builder addEmailAttribute(final String email) {
+			if (this.attributes == null) {
+				this.attributes = new ReceiptAttributes();
+			}
+			this.attributes.setEmail(email);
 			return this;
 		}
 		
-		public Receipt buildSale() {
+		public Receipt buildSaleReceipt() {
 			Receipt receipt = new Receipt();
 			receipt.setDeviceId(deviceId);
-			receipt.setTimeout(5);
 			receipt.setType(OPERATION_SALE);
 			receipt.setTaxMode(taxMode);
 			receipt.setPositions(positions.toArray(new ReceiptPosition[positions.size()]));
@@ -180,9 +190,10 @@ public class Receipt {
 			if (this.attributes != null) {
 				receipt.setAttributes(attributes);
 			}
-			int totalSum = payments.stream().collect(Collectors.averagingInt(p -> p.getSum())).intValue();
+			long totalSum = payments.stream().collect(Collectors.averagingLong(p -> p.getSum())).longValue();
 			receipt.setTotal(new ReceiptTotal(totalSum));
 			return receipt;
 		}
 	}
+
 }

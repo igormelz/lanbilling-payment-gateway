@@ -4,10 +4,10 @@ public class ReceiptPosition {
 	private final String name;
 	private String type;
 	private int quantity;
-	private int price;
-	private int priceSum;
+	private long price;
+	private long priceSum;
 	private String tax;
-	private int taxSum;
+	private long taxSum;
 	private ReceiptFfdTag[] tags;
 
 	public ReceiptPosition(String name) {
@@ -34,19 +34,19 @@ public class ReceiptPosition {
 		this.quantity = quantity;
 	}
 
-	public int getPrice() {
+	public long getPrice() {
 		return price;
 	}
 
-	public void setPrice(int price) {
+	public void setPrice(long price) {
 		this.price = price;
 	}
 
-	public int getPriceSum() {
+	public long getPriceSum() {
 		return priceSum;
 	}
 
-	public void setPriceSum(int priceSum) {
+	public void setPriceSum(long priceSum) {
 		this.priceSum = priceSum;
 	}
 
@@ -58,7 +58,7 @@ public class ReceiptPosition {
 		this.tax = tax;
 	}
 
-	public int getTaxSum() {
+	public long getTaxSum() {
 		return taxSum;
 	}
 

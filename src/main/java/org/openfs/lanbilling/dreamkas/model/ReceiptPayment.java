@@ -1,15 +1,15 @@
 package org.openfs.lanbilling.dreamkas.model;
 
 public class ReceiptPayment {
-	private final int sum;
+	private final long sum;
 	private final String type;
 
-	public ReceiptPayment(int amount, String type) {
+	public ReceiptPayment(long amount, String type) {
 		this.sum = amount * 100;
 		this.type = type;
 	}
 	
-	public int getSum() {
+	public long getSum() {
 		return sum;
 	}
 
