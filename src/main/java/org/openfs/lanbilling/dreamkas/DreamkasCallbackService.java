@@ -38,19 +38,19 @@ public class DreamkasCallbackService implements Processor {
 		if (body.get("type").toString().equalsIgnoreCase(TYPE_OPERATION)) {
 			Operation operation = JSON.parseObject(body.get("data").toString(), Operation.class);
 			if (operation.getStatus().equalsIgnoreCase(Operation.ERROR) && operation.getData() != null) {
-				LOG.error("Operation id:{} type:{} -- {}", operation.getId(), operation.getType(),
+				LOG.error("Receipt id:{} op_type:{} -- {}", operation.getId(), operation.getType(),
 						operation.getData().getError().getCode());
 			} else {
-				LOG.info("Operation id:{}, type:{}, status:{}", operation.getId(), operation.getType(),
+				LOG.info("Receipt id:{}, op_type:{}, status:{}", operation.getId(), operation.getType(),
 						operation.getStatus());
 			}
 		} else {
-			LOG.info("Unparsing callback data:{}", body.get("data"));
+			LOG.info("Receive unparsing data:{}", body.get("data"));
 		}
 
 		// response OK with null body
 		message.setBody(null);
-		message.setHeader(exchange.HTTP_RESPONSE_CODE, StatusCodes.ACCEPTED);
+		message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.ACCEPTED);
 	}
 
 }

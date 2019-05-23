@@ -42,7 +42,7 @@ public class Receipt {
 
 	private int deviceId;
 	private String type;
-	private int timeout;
+	private int timeout = 5;
 	private String taxMode;
 	private ReceiptPosition[] positions;
 	private ReceiptPayment[] payments;
@@ -125,7 +125,7 @@ public class Receipt {
 	public static Builder builder(int deviceId, String taxmode) {
 		return new Builder(deviceId, taxmode);
 	}
-	
+
 	public static final class Builder {
 		private final int deviceId;
 		private final String taxMode;
@@ -136,6 +136,11 @@ public class Receipt {
 		Builder(final int deviceId, final String taxMode) {
 			this.deviceId = deviceId;
 			this.taxMode = taxMode;
+		}
+
+		public Builder addPosition(ReceiptPosition position) {
+			this.positions.add(position);
+			return this;
 		}
 
 		public Builder addNoTaxServicePosition(String name, long price) {
@@ -149,13 +154,13 @@ public class Receipt {
 			return this;
 		}
 
-		public Builder addPayment(int amount, String paymentType) {
+		public Builder addPayment(long amount, String paymentType) {
 			this.payments.add(new ReceiptPayment(amount, paymentType));
 			return this;
 		}
 
-		public Builder addPosition(ReceiptPosition position) {
-			this.positions.add(position);
+		public Builder addCardPayment(long amount) {
+			this.payments.add(new ReceiptPayment(amount, PAYMENT_CASHLESS));
 			return this;
 		}
 
@@ -179,7 +184,7 @@ public class Receipt {
 			this.attributes.setEmail(email);
 			return this;
 		}
-		
+
 		public Receipt buildSaleReceipt() {
 			Receipt receipt = new Receipt();
 			receipt.setDeviceId(deviceId);
