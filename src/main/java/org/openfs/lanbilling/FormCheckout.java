@@ -5,7 +5,6 @@ import org.apache.camel.Message;
 import org.apache.camel.Processor;
 import org.openfs.lanbilling.LbSoapService.CodeExternType;
 import org.openfs.lanbilling.LbSoapService.ServiceResponse;
-import org.openfs.lanbilling.sber.SberAcquiringService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,47 +21,40 @@ public class FormCheckout implements Processor {
 	@Autowired
 	LbSoapService lbapi;
 
-	@Autowired
-	SberAcquiringService sberCardService;
-
-	protected void checkout(Message message) {
+	@Override
+	public void process(Exchange exchange) throws Exception {
+		Message message = exchange.getIn();
+		message.setBody("");
+		
 		final String account = message.getHeader("uid", String.class);
 		final double amount = message.getHeader("amount", Double.class);
 		LOG.info("Processing checkout uid:{}, amount:{}", account, amount);
 
-		if (lbapi.connect()) {
-			// verify account
-			ServiceResponse response = lbapi.getAccount(CodeExternType.AGRM_NUM, account);
-			if (response.isSuccess() && response.getValue(account) != null) {
-				// insert prepayment record
-				response = lbapi.insertPrePayment(response.getLong(account), amount);
-				if (response.isSuccess()) {
-					sberCardService.callService(response.getLong(LbSoapService.ORDER_NUMBER), amount, message);
-				} else {
-					LOG.error("Insert prepayment error for uid:{}", account);
-					message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.INTERNAL_SERVER_ERROR);
-				}
-			} else {
-				LOG.warn("uid:{} not found", account);
-				message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.NOT_FOUND);
-			}
-			lbapi.disconnect();
-		} else {
+		if (!lbapi.connect()) {
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.INTERNAL_SERVER_ERROR);
-		}
-	}
-
-	@Override
-	public void process(Exchange exchange) throws Exception {
-		Message message = exchange.getIn();
-		message.removeHeaders("Camel*");
-
-		// validate parameters
-		if (message.getHeader("uid") == null || message.getHeader("amount") == null) {
-			LOG.error("Unknown checkout parameters");
-			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.BAD_REQUEST);
 			return;
 		}
-		checkout(message);
+
+		// LB: verify account by agreement number
+		ServiceResponse response = lbapi.getAccount(CodeExternType.AGRM_NUM, account);
+		if (!response.isSuccess() || response.getValue(account) == null) {
+			lbapi.disconnect();
+			LOG.error("uid:{} not found", account);
+			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.NOT_FOUND);
+			return;
+		}
+
+		// LB: insert prepayment record for agreementId and amount.
+		response = lbapi.insertPrePayment(response.getLong(account), amount);
+		lbapi.disconnect();
+
+		if (!response.isSuccess()) {
+			LOG.error("Insert prepayment error for uid:{}", account);
+			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.NOT_FOUND);
+			return;
+		}
+		
+		LOG.info("Create prepayment orderNumber:{} for uid:{}, amount:{}",response.getLong(LbSoapService.ORDER_NUMBER),account,amount);
+		message.setHeader("orderNumber", response.getLong(LbSoapService.ORDER_NUMBER));
 	}
 }

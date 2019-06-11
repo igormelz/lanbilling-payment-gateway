@@ -15,9 +15,12 @@ import org.springframework.stereotype.Service;
 
 @Service
 @Configuration
-public class DreamkasApiService {
-	private static final Logger LOG = LoggerFactory.getLogger(DreamkasApiService.class);
+public class DreamkasReceiptService {
+	private static final Logger LOG = LoggerFactory.getLogger(DreamkasReceiptService.class);
 
+	@Value("${dreamkas.enable:false}")
+	private boolean isEnable;
+	
 	@Value("${dreamkas.deviceid}")
 	private int deviceId;
 
@@ -30,11 +33,16 @@ public class DreamkasApiService {
 	@EndpointInject(uri = "direct:dreamkas")
 	ProducerTemplate producer;
 
-	public DreamkasApiService() {
+	public DreamkasReceiptService() {
 	}
 
 	@SuppressWarnings("unchecked")
 	public void fiscalization(final String serviceName, Long amount, String phone, String email) {
+		
+		if (!isEnable) {
+			return;
+		}
+	
 		LOG.info("Processing fiscalization service:{}, amount:{}, phone:{}, email:{}", serviceName, amount, phone,
 				email);
 		// create receipt request with no_tax and card payment

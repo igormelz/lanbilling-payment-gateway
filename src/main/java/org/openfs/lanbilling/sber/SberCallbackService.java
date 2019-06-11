@@ -1,15 +1,11 @@
 package org.openfs.lanbilling.sber;
 
-import java.util.Map;
-import java.util.stream.Stream;
-
 import org.apache.camel.Exchange;
 import org.apache.camel.Message;
 import org.apache.camel.Processor;
 import org.openfs.lanbilling.LbSoapService;
-import org.openfs.lanbilling.LbSoapService.CodeExternType;
 import org.openfs.lanbilling.LbSoapService.ServiceResponse;
-import org.openfs.lanbilling.dreamkas.DreamkasApiService;
+import org.openfs.lanbilling.dreamkas.DreamkasReceiptService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,11 +21,11 @@ public class SberCallbackService implements Processor {
 	LbSoapService lbapi;
 
 	@Autowired
-	DreamkasApiService dreamkas;
+	DreamkasReceiptService dreamkas;
 
-	private <K, V> Stream<K> keys(Map<K, V> map, V value) {
-		return map.entrySet().stream().filter(entry -> value.equals(entry.getValue())).map(Map.Entry::getKey);
-	}
+//	private <K, V> Stream<K> keys(Map<K, V> map, V value) {
+//		return map.entrySet().stream().filter(entry -> value.equals(entry.getValue())).map(Map.Entry::getKey);
+//	}
 
 	@Override
 	public void process(Exchange exchange) throws Exception {
@@ -45,7 +41,7 @@ public class SberCallbackService implements Processor {
 		// check required parameters
 		if (message.getHeader("status") == null || message.getHeader("mdOrder") == null
 				|| message.getHeader("operation") == null || message.getHeader("orderNumber") == null) {
-			LOG.error("Request parameters");
+			LOG.error("check request parameters");
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.BAD_REQUEST);
 			return;
 		}
@@ -91,7 +87,7 @@ public class SberCallbackService implements Processor {
 			LOG.warn("Prepayment orderNumber:{} not found", orderNumber);
 			return StatusCodes.NOT_FOUND;
 		}
-		LOG.info("Found prepayment orderNumber:{}, amount:{}, agreementId:{}, date:{}]", orderNumber,
+		LOG.info("Found prepayment orderNumber:{}, amount:{}, agreementId:{}, date:[{}]", orderNumber,
 				prepayment.getValue(LbSoapService.AMOUNT), prepayment.getValue(LbSoapService.AGREEMENT_ID),
 				prepayment.getValue(LbSoapService.PREPAYMENT_PAY_DATE));
 
@@ -100,11 +96,22 @@ public class SberCallbackService implements Processor {
 			if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_PROCESSED) {
 				LOG.warn("Payment already processed for orderNumber:{}", orderNumber);
 				return StatusCodes.ACCEPTED;
-			} else if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_CANCELED) {
+			}
+			if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_CANCELED) {
 				LOG.warn("Prepayment canceled for orderNumber:{}", orderNumber);
 				return StatusCodes.ACCEPTED;
-			} else {
-				return payment(orderNumber, receipt, prepayment);
+			} 
+			// confirm prepayment
+			ServiceResponse payment = lbapi.confirmPrePayment(orderNumber,
+					(Double) prepayment.getValue(LbSoapService.AMOUNT), receipt);
+			if (payment.isSuccess()) {
+				LOG.info("Success processed payment orderNumber:{}, amount:{}", orderNumber,
+						prepayment.getValue(LbSoapService.AMOUNT));
+				return StatusCodes.OK;
+			}
+			if (payment.isFault()) {
+				// process fault message
+				return processFaultResponse((String) payment.getBody());
 			}
 		}
 		// refunded, reversed operations
@@ -134,38 +141,22 @@ public class SberCallbackService implements Processor {
 		LOG.warn("Refunded payment not found. Cancel prepayment orderNumber:{}", orderNumber);
 		return StatusCodes.OK;
 	}
-
-	private int payment(Long orderNumber, String receipt, ServiceResponse prepayment) {
-		// confirm prepayment
-		ServiceResponse response = lbapi.confirmPrePayment(orderNumber,
-				(Double) prepayment.getValue(LbSoapService.AMOUNT), receipt);
-		if (response.isSuccess()) {
-			LOG.info("Processed payment orderNumber:{}, amount:{}", orderNumber,
-					prepayment.getValue(LbSoapService.AMOUNT));
+		
 			// get account info
-			response = lbapi.getAccount(CodeExternType.AGRM_ID,
-					prepayment.getValue(LbSoapService.AGREEMENT_ID).toString());
-			if (response.isSuccess()) {
-				LOG.info("SUCCCESS - uid:{}, amount:{}, balance:{}, name:{}, phone:{}, email:{}",
-						keys(response.getValues(), prepayment.getLong(LbSoapService.AGREEMENT_ID)).findFirst().get(),
-						prepayment.getValue(LbSoapService.AMOUNT), response.getValue(LbSoapService.TOTAL_BALANCE),
-						response.getString(LbSoapService.NAME), response.getString(LbSoapService.PHONE),
-						response.getString(LbSoapService.EMAIL));
-				// process fiscal recept
-				dreamkas.fiscalization("Оплата за услуги связи",
-						((Double) prepayment.getValue(LbSoapService.AMOUNT)).longValue(),
-						response.getString(LbSoapService.PHONE), response.getString(LbSoapService.EMAIL));
-			}
-			return StatusCodes.OK;
-		}
-		if (response.isFault()) {
-			// process fault message
-			return processFaultResponse((String) response.getBody());
-		}
-		// no response or internal error
-		LOG.error("Internal Server error");
-		return StatusCodes.INTERNAL_SERVER_ERROR;
-	}
+//			response = lbapi.getAccount(CodeExternType.AGRM_ID,
+//					prepayment.getValue(LbSoapService.AGREEMENT_ID).toString());
+//			if (response.isSuccess()) {
+//				LOG.info("SUCCCESS - uid:{}, amount:{}, balance:{}, name:{}, phone:{}, email:{}",
+//						keys(response.getValues(), prepayment.getLong(LbSoapService.AGREEMENT_ID)).findFirst().get(),
+//						prepayment.getValue(LbSoapService.AMOUNT), response.getValue(LbSoapService.TOTAL_BALANCE),
+//						response.getString(LbSoapService.NAME), response.getString(LbSoapService.PHONE),
+//						response.getString(LbSoapService.EMAIL));
+				// process fiscal receipt				
+//				dreamkas.fiscalization("Оплата за услуги связи",
+//						((Double) prepayment.getValue(LbSoapService.AMOUNT)).longValue(),
+//						response.getString(LbSoapService.PHONE), response.getString(LbSoapService.EMAIL));
+//			}
+
 
 	private int cancelOperation(String operation, Long orderNumber) {
 		LOG.info("Processing status:UNSUCCESS, orderNumber:{}, operation:{}", orderNumber, operation);
@@ -181,7 +172,7 @@ public class SberCallbackService implements Processor {
 			// cancel prepayment
 			response = lbapi.cancelPrePayment(orderNumber);
 			if (response.isSuccess()) {
-				LOG.warn("Canceled prepayment orderNumber:{}", orderNumber);
+				LOG.info("Canceled prepayment orderNumber:{}", orderNumber);
 			} else if (response.isFault()) {
 				LOG.warn("Server response fault:{} for orderNumber:{}", response.getBody(), orderNumber);
 			} else {
