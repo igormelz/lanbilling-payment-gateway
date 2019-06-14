@@ -1,9 +1,12 @@
 package org.openfs.lanbilling.sber;
 
-import org.apache.camel.Exchange;
-import org.apache.camel.Message;
-import org.apache.camel.Processor;
+import java.util.Map;
+import java.util.stream.Stream;
+
+import org.apache.camel.Handler;
+import org.apache.camel.Header;
 import org.openfs.lanbilling.LbSoapService;
+import org.openfs.lanbilling.LbSoapService.CodeExternType;
 import org.openfs.lanbilling.LbSoapService.ServiceResponse;
 import org.openfs.lanbilling.dreamkas.DreamkasReceiptService;
 import org.slf4j.Logger;
@@ -14,7 +17,7 @@ import org.springframework.stereotype.Component;
 import io.undertow.util.StatusCodes;
 
 @Component("sberCallback")
-public class SberCallbackService implements Processor {
+public class SberCallbackService {
 	private static final Logger LOG = LoggerFactory.getLogger(SberCallbackService.class);
 
 	@Autowired
@@ -23,188 +26,171 @@ public class SberCallbackService implements Processor {
 	@Autowired
 	DreamkasReceiptService dreamkas;
 
-//	private <K, V> Stream<K> keys(Map<K, V> map, V value) {
-//		return map.entrySet().stream().filter(entry -> value.equals(entry.getValue())).map(Map.Entry::getKey);
-//	}
+	private <K, V> Stream<K> keys(Map<K, V> map, V value) {
+		return map.entrySet().stream().filter(entry -> value.equals(entry.getValue())).map(Map.Entry::getKey);
+	}
 
-	@Override
-	public void process(Exchange exchange) throws Exception {
-		Message message = exchange.getIn();
-		message.removeHeaders("Camel*");
+	private String getStatus(Long status) {
+		return (status == LbSoapService.STATUS_PROCESSED) ? "processed"
+				: (status == LbSoapService.STATUS_CANCELED) ? "canceled" : "ready";
+	}
 
-		// connect to LB
+	private ServiceResponse lookupPrePayment(Long orderNumber) {
+		ServiceResponse prepayment = lbapi.getPrePayment(orderNumber);
+		if (prepayment.isSuccess()) {
+			LOG.info("Found prepayment orderNumber:{}, amount:{}, created:[{}], status:{} [{}]",
+					orderNumber, prepayment.getValue(LbSoapService.AMOUNT),
+					prepayment.getValue(LbSoapService.PREPAYMENT_PAY_DATE),
+					prepayment.getLong(LbSoapService.PREPAYMENT_STATUS),
+					getStatus(prepayment.getLong(LbSoapService.PREPAYMENT_STATUS)));
+			// get account info
+			ServiceResponse response = lbapi.getAccount(CodeExternType.AGRM_ID,
+					prepayment.getValue(LbSoapService.AGREEMENT_ID).toString());
+			if (response.isSuccess()) {
+				LOG.info("Account Info by orderNumber:{} -- argeement:{}, balance:{}, name:[{}], phone:[{}], email:[{}]",
+						orderNumber,
+						keys(response.getValues(), prepayment.getValue(LbSoapService.AGREEMENT_ID)).findFirst().get(),
+						response.getValue(LbSoapService.TOTAL_BALANCE), response.getString(LbSoapService.NAME),
+						response.getString(LbSoapService.PHONE), response.getString(LbSoapService.EMAIL));
+			}
+			return prepayment;
+		}
+		LOG.error("Prepayment orderNumber:{} not found", orderNumber);
+		return null;
+	}
+
+	@Handler
+	public int processPayment(@Header("orderNumber") Long orderNumber, @Header("mdOrder") String receipt) {
+		LOG.info("Processing payment orderNumber:{}, receipt:{}", orderNumber, receipt);
+
 		if (!lbapi.connect()) {
-			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.SERVICE_UNAVAILABLE);
-			return;
+			return StatusCodes.SERVICE_UNAVAILABLE;
 		}
 
-		// check required parameters
-		if (message.getHeader("status") == null || message.getHeader("mdOrder") == null
-				|| message.getHeader("operation") == null || message.getHeader("orderNumber") == null) {
-			LOG.error("check request parameters");
-			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.BAD_REQUEST);
-			return;
+		// lookup LB prepayment record
+		ServiceResponse prepayment = lookupPrePayment(orderNumber);
+		if (prepayment == null) {
+			lbapi.disconnect();
+			return StatusCodes.NOT_FOUND;
 		}
 
-		// process request and set response code
-		message.setHeader(Exchange.HTTP_RESPONSE_CODE,
-				doProcess(message.getHeader("status", Integer.class), message.getHeader("operation", String.class),
-						message.getHeader("orderNumber", Long.class), message.getHeader("mdOrder", String.class)));
-
-		// close connection
-		lbapi.disconnect();
-	}
-
-	protected int doProcess(int status, String operation, Long orderNumber, String receipt) {
-		if (status == 1) {
-			return doOperation(operation, orderNumber, receipt);
-		}
-		if (status == 0) {
-			return cancelOperation(operation, orderNumber);
-		}
-		LOG.error("Request has unknown status:{}", status);
-		return StatusCodes.NOT_FOUND;
-	}
-
-	private int doOperation(String operation, Long orderNumber, String receipt) {
-		LOG.info("Processing status:SUCCESS, orderNumber:{}, operation:{}, receipt:{}", orderNumber, operation,
-				receipt);
-
-		// process by operation
-		if (operation.equalsIgnoreCase("approved")) {
-			LOG.info("NOOP: Approved operation.");
+		// validate prepayment status
+		if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_PROCESSED) {
+			LOG.warn("Payment already processed for orderNumber:{}", orderNumber);
+			lbapi.disconnect();
 			return StatusCodes.OK;
 		}
 
-		if (!operation.matches("deposited|reversed|refunded")) {
-			LOG.warn("Unknown operation:{}", operation);
+		if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_CANCELED) {
+			LOG.error("Payment fail for orderNumber:{} - prepayment canceled [{}]", orderNumber,
+					prepayment.getValue(LbSoapService.PREPAYMENT_CANCEL_DATE));
+			lbapi.disconnect();
+			return StatusCodes.OK;
+		}
+
+		// confirm prepayment
+		ServiceResponse payment = lbapi.confirmPrePayment(orderNumber,
+				(Double) prepayment.getValue(LbSoapService.AMOUNT), receipt);
+
+		if (payment.isSuccess()) {
+			LOG.info("Payment success for orderNumber:{}, amount:{}", orderNumber,
+					prepayment.getValue(LbSoapService.AMOUNT));
+			lbapi.disconnect();
+			return StatusCodes.OK;
+		}
+
+		if (payment.isFault()) {
+			LOG.warn("LB return fault:{}", payment.getBody());
+		}
+		return StatusCodes.NOT_ACCEPTABLE;
+	}
+
+	@Handler
+	public int processRefund(@Header("orderNumber") Long orderNumber, @Header("mdOrder") String receipt) {
+		LOG.info("Processing refund orderNumber:{}, receipt:{}", orderNumber, receipt);
+
+		if (!lbapi.connect()) {
+			return StatusCodes.SERVICE_UNAVAILABLE;
+		}
+
+		// lookup LB prepayment record
+		ServiceResponse prepayment = lookupPrePayment(orderNumber);
+		if (prepayment == null) {
+			lbapi.disconnect();
 			return StatusCodes.NOT_FOUND;
 		}
 
-		// lookup prepayment record
-		ServiceResponse prepayment = lbapi.getPrePayment(orderNumber);
-		if (!prepayment.isSuccess()) {
-			LOG.warn("Prepayment orderNumber:{} not found", orderNumber);
-			return StatusCodes.NOT_FOUND;
-		}
-		LOG.info("Found prepayment orderNumber:{}, amount:{}, agreementId:{}, date:[{}]", orderNumber,
-				prepayment.getValue(LbSoapService.AMOUNT), prepayment.getValue(LbSoapService.AGREEMENT_ID),
-				prepayment.getValue(LbSoapService.PREPAYMENT_PAY_DATE));
-
-		// deposited operation
-		if (operation.equalsIgnoreCase("deposited")) {
-			if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_PROCESSED) {
-				LOG.warn("Payment already processed for orderNumber:{}", orderNumber);
-				return StatusCodes.ACCEPTED;
-			}
-			if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_CANCELED) {
-				LOG.warn("Prepayment canceled for orderNumber:{}", orderNumber);
-				return StatusCodes.ACCEPTED;
-			} 
-			// confirm prepayment
-			ServiceResponse payment = lbapi.confirmPrePayment(orderNumber,
-					(Double) prepayment.getValue(LbSoapService.AMOUNT), receipt);
-			if (payment.isSuccess()) {
-				LOG.info("Success processed payment orderNumber:{}, amount:{}", orderNumber,
-						prepayment.getValue(LbSoapService.AMOUNT));
-				return StatusCodes.OK;
-			}
-			if (payment.isFault()) {
-				// process fault message
-				return processFaultResponse((String) payment.getBody());
-			}
-		}
-		// refunded, reversed operations
 		if (prepayment.getValue(LbSoapService.PAYMENT_ID) != null && prepayment.getLong(LbSoapService.PAYMENT_ID) != 0
 				&& prepayment.getValue(LbSoapService.RECEIPT) != null) {
-			// refund payment
+			// try refund payment
 			ServiceResponse response = lbapi.cancelPayment(prepayment.getString(LbSoapService.RECEIPT));
+			lbapi.disconnect();
 			if (response.isSuccess()) {
-				LOG.info("Processed refund payment orderNumber:{}, amount:{}", orderNumber,
+				LOG.info("Success refund payment orderNumber:{}, amount:{}", orderNumber,
 						prepayment.getValue(LbSoapService.AMOUNT));
 				return StatusCodes.OK;
 			}
-			// process fault message
 			if (response.isFault()) {
-				return processFaultResponse((String) response.getBody());
+				LOG.warn("LB return fault:{}", response.getBody());
 			}
-			// no response or internal error
-			LOG.error("Refunded has server error");
-			return StatusCodes.INTERNAL_SERVER_ERROR;
+			return StatusCodes.NOT_ACCEPTABLE;
+		} else {
+			// payment not confirmed - try to delete prepayment record
+			ServiceResponse response = lbapi.cancelPrePayment(orderNumber);
+			lbapi.disconnect();
+			if (!response.isSuccess()) {
+				LOG.error("Refunded payment not found. Error cancel prepayment orderNumber:{}", orderNumber);
+				return StatusCodes.NOT_ACCEPTABLE;
+			}
+			LOG.warn("Refunded payment not found. Cancel prepayment orderNumber:{}", orderNumber);
+			return StatusCodes.OK;
 		}
-		// payment not confirmed - try to delete prepayment record
-		ServiceResponse response = lbapi.cancelPrePayment(orderNumber);
-		if (!response.isSuccess()) {
-			LOG.error("Refunded payment not found. Error cancel prepayment orderNumber:{}", orderNumber);
-			return StatusCodes.INTERNAL_SERVER_ERROR;
-		}
-		LOG.warn("Refunded payment not found. Cancel prepayment orderNumber:{}", orderNumber);
-		return StatusCodes.OK;
 	}
-		
-			// get account info
-//			response = lbapi.getAccount(CodeExternType.AGRM_ID,
-//					prepayment.getValue(LbSoapService.AGREEMENT_ID).toString());
-//			if (response.isSuccess()) {
-//				LOG.info("SUCCCESS - uid:{}, amount:{}, balance:{}, name:{}, phone:{}, email:{}",
-//						keys(response.getValues(), prepayment.getLong(LbSoapService.AGREEMENT_ID)).findFirst().get(),
-//						prepayment.getValue(LbSoapService.AMOUNT), response.getValue(LbSoapService.TOTAL_BALANCE),
-//						response.getString(LbSoapService.NAME), response.getString(LbSoapService.PHONE),
-//						response.getString(LbSoapService.EMAIL));
-				// process fiscal receipt				
+
+	// process fiscal receipt
 //				dreamkas.fiscalization("Оплата за услуги связи",
 //						((Double) prepayment.getValue(LbSoapService.AMOUNT)).longValue(),
 //						response.getString(LbSoapService.PHONE), response.getString(LbSoapService.EMAIL));
 //			}
 
+	@Handler
+	public int cancelPrePayment(@Header("orderNumber") Long orderNumber, @Header("operation") String operation,
+			@Header("mdOrder") String receipt) {
+		LOG.info("Processing cancel operation:{}, orderNumber:{}, receipt:{}", operation, orderNumber, receipt);
 
-	private int cancelOperation(String operation, Long orderNumber) {
-		LOG.info("Processing status:UNSUCCESS, orderNumber:{}, operation:{}", orderNumber, operation);
-
-		// lookup prepayment record
-		ServiceResponse response = lbapi.getPrePayment(orderNumber);
-		if (!response.isSuccess()) {
-			LOG.warn("Prepayment orderNumber:{} not found", orderNumber);
-		} else if (response.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_CANCELED) {
-			LOG.warn("Prepayment orderNumber:{} already canceled [{}]", orderNumber,
-					response.getString(LbSoapService.PREPAYMENT_CANCEL_DATE));
-		} else {
-			// cancel prepayment
-			response = lbapi.cancelPrePayment(orderNumber);
-			if (response.isSuccess()) {
-				LOG.info("Canceled prepayment orderNumber:{}", orderNumber);
-			} else if (response.isFault()) {
-				LOG.warn("Server response fault:{} for orderNumber:{}", response.getBody(), orderNumber);
-			} else {
-				LOG.error("Internal server errror or cannot cancel orderNumber:{}", orderNumber);
-			}
+		if (!lbapi.connect()) {
+			return StatusCodes.SERVICE_UNAVAILABLE;
 		}
-		return StatusCodes.OK;
-	}
 
-	private int processFaultResponse(String fault) {
-		if (fault.matches(".*not found.*")) {
-			LOG.error("Not found:{}", fault);
+		// lookup LB prepayment record
+		ServiceResponse prepayment = lookupPrePayment(orderNumber);
+		if (prepayment == null) {
+			lbapi.disconnect();
 			return StatusCodes.NOT_FOUND;
 		}
-		if (fault.matches(".*is cancelled \\(record_id = (\\d+)\\).*")) {
-			LOG.warn("Cancelled: {}", fault);
+
+		if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_CANCELED) {
+			LOG.warn("Prepayment orderNumber:{} already canceled [{}]", orderNumber,
+					prepayment.getString(LbSoapService.PREPAYMENT_CANCEL_DATE));
+			lbapi.disconnect();
 			return StatusCodes.OK;
 		}
-		if (fault.matches(".*already exists \\(record_id = (\\d+)\\).*")) {
-			LOG.warn("Payment duplicate: {}", fault);
+
+		if (operation.equalsIgnoreCase("deposited")) {
+			LOG.warn("Received unsuccess deposited -- do nothing, waiting to success.");
+			lbapi.disconnect();
 			return StatusCodes.OK;
 		}
-		if (fault.matches(".*cannot be cancelled.*")) {
-			LOG.error("Payment cannot be cancelled: {}", fault);
-			return StatusCodes.INTERNAL_SERVER_ERROR;
+
+		// try to cancel prepayment record
+		ServiceResponse response = lbapi.cancelPrePayment(orderNumber);
+		lbapi.disconnect();
+		if (!response.isSuccess()) {
+			LOG.error("Error cancel prepayment orderNumber:{}", orderNumber);
+			return StatusCodes.NOT_ACCEPTABLE;
 		}
-		if (fault.matches(".*already cancelled \\(record_id = (\\d+)\\).*")) {
-			LOG.warn("Payment already cancelled: {}", fault);
-			return StatusCodes.OK;
-		}
-		LOG.error("Server return fault response: {}", fault);
-		return StatusCodes.INTERNAL_SERVER_ERROR;
+		LOG.info("Prepayment success canceled orderNumber:{}", orderNumber);
+		return StatusCodes.OK;
 	}
 
 }

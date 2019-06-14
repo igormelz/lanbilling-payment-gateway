@@ -90,7 +90,6 @@ public class SberRegisterQrderService implements Processor {
 				}
 			}
 			// otherwise return error 
-			LOG.error("Order not registered");
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.NOT_ACCEPTABLE);
 		} catch (CamelExecutionException e) {
 			LOG.error("Sber got exception:{}", e.getMessage());

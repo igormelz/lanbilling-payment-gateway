@@ -5,7 +5,6 @@ import java.util.Map;
 import javax.xml.ws.soap.SOAPFaultException;
 
 import org.apache.camel.Exchange;
-import org.apache.camel.ExchangePattern;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.fastjson.FastjsonDataFormat;
@@ -39,7 +38,7 @@ public class PaymentGatewayApplication {
 	}
 
 	@Bean
-	RouteBuilder lbpayRoutes() {
+	RouteBuilder paymentGateway() {
 		return new RouteBuilder() {
 
 			@Override
@@ -62,14 +61,29 @@ public class PaymentGatewayApplication {
 				rest("/sber/callback")
 					.bindingMode(RestBindingMode.off)
 					.get()
-						.param().name("status").dataType("integer").description("operation status").endParam()
-						.param().name("mdOrder").dataType("string").description("receipt").endParam()
-						.param().name("operation").dataType("string").description("opration").endParam()
-						.param().name("orderNumber").dataType("string").description("orderNumber").endParam()
-						.clientRequestValidation(true)
-						.route().id("ProcessSberCallback")
-							.setExchangePattern(ExchangePattern.InOnly)
-							.process("sberCallback")
+						.route().id("SberCallback")
+							//.setExchangePattern(ExchangePattern.InOnly)
+							.onException(PredicateValidationException.class)
+								.handled(true)
+								.log(LoggingLevel.WARN, "${exception.message}")
+								.setBody(constant(""))
+								.setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400))
+							.end()
+							.validate(and(header("status").isNotNull(),header("operation").isNotNull(),header("mdOrder").isNotNull(),header("orderNumber").isNotNull()))
+							.validate(header("status").in("0","1"))
+							.choice()
+								.when(and(header("status").isEqualTo("1"),header("operation").isEqualTo("deposited")))
+									.setHeader(Exchange.HTTP_RESPONSE_CODE,method("sberCallback","processPayment"))
+								.when(and(header("status").isEqualTo("1"),header("operation").isEqualTo("approved")))
+									.setHeader(Exchange.HTTP_RESPONSE_CODE,constant(200))
+								.when(and(header("status").isEqualTo("1"),header("operation").in("refunded","reversed")))
+									.setHeader(Exchange.HTTP_RESPONSE_CODE,method("sberCallback","processRefund"))
+								.when(header("status").isEqualTo("0"))
+									.setHeader(Exchange.HTTP_RESPONSE_CODE,method("sberCallback","cancelPrePayment"))
+								.otherwise()
+									.log(LoggingLevel.ERROR,"Receive unknown operation: ${headers}")
+									.setHeader(Exchange.HTTP_RESPONSE_CODE,constant(200))
+							.end()						
 							.setHeader("dreamkasEnable",constant("{{dreamkas.enable"))
 							.filter(header("dreamkas").isEqualTo("true"))
 								.log("Call fiscalization")
@@ -78,29 +92,30 @@ public class PaymentGatewayApplication {
 
 				// form payment endpoint
 				rest("/checkout")
-					.enableCORS(true)
 					.bindingMode(RestBindingMode.off)
-					// validate
-					.get().description("Process validate user agreement number")
+					.get().enableCORS(true).description("Validate account (agreement number)")
 						.route()
 							.routeId("ProcessFormValidate")
-							.process("formValidate")
-						.endRest()
-					// checkout
-					.post().description("Process Form Checkout parameters")
-						.param().name("uid").dataType("integer").description("user agreement").endParam()
-						.param().name("amount").dataType("integer").description("amount").endParam()
-						.clientRequestValidation(true)
-						.route().id("ProcessFormCheckout")
-							// handle validate exception
 							.onException(PredicateValidationException.class)
 								.handled(true)
-								.log(LoggingLevel.ERROR, "Wrong query parameters")
-								.setBody(constant("Wrong query parameters"))
+								.log(LoggingLevel.WARN, "uid:[${header.uid}]:${exception.message}")
+								.setBody(constant(""))
 								.setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400))
 							.end()
-							// validate input parameters
-							.validate(and(header("amount").isNotNull(), header("uid").isNotNull()))
+							.validate(and(header("uid").isNotNull(),header("uid").regex("\\d{6}")))
+							.setHeader(Exchange.HTTP_RESPONSE_CODE,method("validateAccount"))
+							.setBody(constant(""))
+						.endRest()
+					.post().description("Processing Form Checkout")
+						.route().id("ProcessFormCheckout")
+							.onException(PredicateValidationException.class)
+								.handled(true)
+								.log(LoggingLevel.WARN, "${exception.message}")
+								.setBody(constant(""))
+								.setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400))
+							.end()
+							.validate(and(header("amount").isNotNull(),header("amount").regex("^[1-9][0-9]{1,4}$")))
+							.validate(and(header("uid").isNotNull(),header("uid").regex("^\\d{6}$")))
 							// process request to create LB prepayment record and get orderNumber
 							.process("formCheckout")
 							.filter(header("orderNumber").isNotNull())
@@ -121,7 +136,7 @@ public class PaymentGatewayApplication {
 				from("direct:sberRegisterOrder").id("SberRegisterOrder")
 					.onException(Exception.class)
 						.handled(true)
-						.log(LoggingLevel.ERROR, "got exception: ${body}")
+						.log(LoggingLevel.ERROR, "register failed with exception:${exception}")
 					.end()
 					.to("undertow:{{sber.Url}}?throwExceptionOnFailure=false&sslContextParameters=#sslContext")
 					.filter(header(Exchange.HTTP_RESPONSE_CODE).isEqualTo(200))
@@ -129,7 +144,7 @@ public class PaymentGatewayApplication {
 						.unmarshal(formatMap)
 					.end()
 					.filter(header(Exchange.HTTP_RESPONSE_CODE).isNotEqualTo(200))
-						.log(LoggingLevel.ERROR,"got error response code:${header.CamelHttpResponseCode}. body:[${body}]")
+						.log(LoggingLevel.ERROR,"error response code:${header.CamelHttpResponseCode}. body:[${body}]")
 					.end();
 					
 
@@ -137,7 +152,7 @@ public class PaymentGatewayApplication {
 				from("direct:lbsoap").id("LBcoreSoapBackend")
 					.onException(SOAPFaultException.class)
 						.handled(true)
-						.log(LoggingLevel.ERROR, "got exception:${body}")
+						.log(LoggingLevel.ERROR, "${exception.message}")
 					.end()
 					.marshal(lbsoap)
 					.setHeader(Exchange.HTTP_METHOD).constant("POST")
@@ -155,7 +170,7 @@ public class PaymentGatewayApplication {
 				from("direct:dreamkas").id("DreamkasReceiptsBackend").autoStartup("{{dreamkas.enable}}")
 					.onException(Exception.class)
 						.handled(true)
-						.log(LoggingLevel.ERROR, "we got exception:${body}")
+						.log(LoggingLevel.ERROR, "failed with exception")
 					.end()
 					.marshal(formatReceipt)
 					.log(LoggingLevel.DEBUG, "request:${body}")
