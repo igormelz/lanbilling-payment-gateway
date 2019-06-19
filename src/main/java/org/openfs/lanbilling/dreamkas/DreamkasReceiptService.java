@@ -20,9 +20,12 @@ public class DreamkasReceiptService {
 
 	@Value("${dreamkas.enable:false}")
 	private boolean isEnable;
-	
+
 	@Value("${dreamkas.deviceid}")
 	private int deviceId;
+
+	@Value("${dreamkas.serviceName}")
+	private String serviceName;
 
 	@Value("${dreamkas.taxmode}")
 	private String taxmode;
@@ -30,33 +33,42 @@ public class DreamkasReceiptService {
 	@Value("${dreamkas.token}")
 	private String token;
 
-	@EndpointInject(uri = "direct:dreamkas")
+	@EndpointInject(uri = "seda:dreamkas")
 	ProducerTemplate producer;
 
 	public DreamkasReceiptService() {
 	}
 
 	@SuppressWarnings("unchecked")
-	public void fiscalization(final String serviceName, Long amount, String phone, String email) {
-		
+	public void fiscalization(Long amount, String phone, String email) {
+
 		if (!isEnable) {
 			return;
 		}
-	
-		LOG.info("Processing fiscalization service:{}, amount:{}, phone:{}, email:{}", serviceName, amount, phone,
+
+		LOG.info("Processing fiscalization service:[{}], amount:{}, phone:{}, email:{}", serviceName, amount, phone,
 				email);
+
 		// create receipt request with no_tax and card payment
 		Receipt.Builder builder = Receipt.builder(deviceId, taxmode).addNoTaxServicePosition(serviceName, amount)
 				.addCardPayment(amount);
+		// add attributes
+		boolean attr = false;
 		if (phone != null && !phone.isEmpty() && phone.matches("^\\+?[1-9]\\d{10,13}+$")) {
 			// fix leading plus
 			builder.addPhoneAttribute((phone.startsWith("+")) ? phone : "+" + phone);
-			LOG.info("receipt using phone:{}", phone);
+			LOG.info("Add receipt attr phone:{}", phone);
+			attr = true;
 		}
 		if (email != null && !email.isEmpty()
 				&& email.matches("^([a-zA-Z0-9_\\-\\.]+)@([a-zA-Z0-9_\\-\\.]+)\\.([a-zA-Z]{2,5})$")) {
 			builder.addEmailAttribute(email);
-			LOG.info("receipt using email:{}", email);
+			LOG.info("Add receipt attr email:{}", email);
+			attr = true;
+		}
+		if (!attr) {
+			LOG.error("No receipt attributes (phone or email) defined");
+			return;
 		}
 		// call api
 		try {

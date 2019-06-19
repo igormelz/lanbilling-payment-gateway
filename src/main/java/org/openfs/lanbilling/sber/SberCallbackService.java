@@ -52,6 +52,10 @@ public class SberCallbackService {
 						keys(response.getValues(), prepayment.getValue(LbSoapService.AGREEMENT_ID)).findFirst().get(),
 						response.getValue(LbSoapService.TOTAL_BALANCE), response.getString(LbSoapService.NAME),
 						response.getString(LbSoapService.PHONE), response.getString(LbSoapService.EMAIL));
+				// add account info to prepayment response 
+				Map<String,Object> values = prepayment.getValues();
+				values.put(LbSoapService.PHONE, response.getString(LbSoapService.PHONE));
+				values.put(LbSoapService.EMAIL, response.getString(LbSoapService.EMAIL));	
 			}
 			return prepayment;
 		}
@@ -96,6 +100,11 @@ public class SberCallbackService {
 			LOG.info("Payment success for orderNumber:{}, amount:{}", orderNumber,
 					prepayment.getValue(LbSoapService.AMOUNT));
 			lbapi.disconnect();
+			
+			// process fiscal receipt
+			dreamkas.fiscalization(((Double) prepayment.getValue(LbSoapService.AMOUNT)).longValue(),
+					prepayment.getString(LbSoapService.PHONE), prepayment.getString(LbSoapService.EMAIL));
+			
 			return StatusCodes.OK;
 		}
 
@@ -146,12 +155,6 @@ public class SberCallbackService {
 			return StatusCodes.OK;
 		}
 	}
-
-	// process fiscal receipt
-//				dreamkas.fiscalization("Оплата за услуги связи",
-//						((Double) prepayment.getValue(LbSoapService.AMOUNT)).longValue(),
-//						response.getString(LbSoapService.PHONE), response.getString(LbSoapService.EMAIL));
-//			}
 
 	@Handler
 	public int cancelPrePayment(@Header("orderNumber") Long orderNumber, @Header("operation") String operation,

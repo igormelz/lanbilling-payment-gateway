@@ -83,10 +83,6 @@ public class PaymentGatewayApplication {
 								.otherwise()
 									.log(LoggingLevel.ERROR,"Receive unknown operation: ${headers}")
 									.setHeader(Exchange.HTTP_RESPONSE_CODE,constant(200))
-							.end()						
-							.setHeader("dreamkasEnable",constant("{{dreamkas.enable"))
-							.filter(header("dreamkas").isEqualTo("true"))
-								.log("Call fiscalization")
 							.end()
 						.endRest();
 
@@ -167,7 +163,7 @@ public class PaymentGatewayApplication {
 					.end();
 
 				// Dreamkas Receipts
-				from("direct:dreamkas").id("DreamkasReceiptsBackend").autoStartup("{{dreamkas.enable}}")
+				from("seda:dreamkas").id("DreamkasReceiptsBackend").autoStartup("{{dreamkas.enable}}")
 					.onException(Exception.class)
 						.handled(true)
 						.log(LoggingLevel.ERROR, "failed with exception")
