@@ -169,8 +169,11 @@ public class PaymentGatewayApplication {
 						.log(LoggingLevel.ERROR, "failed with exception")
 					.end()
 					.marshal(formatReceipt)
-					.log(LoggingLevel.DEBUG, "request:${body}")
+					.log("request:${body}")
 					.to("undertow:https://kabinet.dreamkas.ru/api/receipts?throwExceptionOnFailure=false&sslContextParameters=#sslContext")
+					.filter(header(Exchange.HTTP_RESPONSE_CODE).isNotEqualTo(202))
+						.log(LoggingLevel.ERROR,"Return unsuccess: ${body}")
+					.end()
 					.unmarshal(formatMap);
 
 			}

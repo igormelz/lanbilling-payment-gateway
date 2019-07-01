@@ -51,6 +51,7 @@ public class LbSoapService {
 	public static final String USER_ID = "uid";
 	public static final String AMOUNT = "amount";
 	public static final String AGREEMENT_ID = "agrmId";
+	public static final String AGREEMENT = "agreement";
 	public static final String RECEIPT = "receipt";
 	public static final String PAYMENT_ID = "paymentId";
 	public static final String ORDER_NUMBER = "orderNumber";

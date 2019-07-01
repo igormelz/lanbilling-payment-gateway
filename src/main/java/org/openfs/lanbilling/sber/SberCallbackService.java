@@ -38,34 +38,37 @@ public class SberCallbackService {
 	private ServiceResponse lookupPrePayment(Long orderNumber) {
 		ServiceResponse prepayment = lbapi.getPrePayment(orderNumber);
 		if (prepayment.isSuccess()) {
-			LOG.info("Found prepayment orderNumber:{}, amount:{}, created:[{}], status:{} [{}]",
-					orderNumber, prepayment.getValue(LbSoapService.AMOUNT),
-					prepayment.getValue(LbSoapService.PREPAYMENT_PAY_DATE),
+			LOG.debug("Found prepayment order:{}, amount:{}, created:[{}], status:{} [{}]", orderNumber,
+					prepayment.getValue(LbSoapService.AMOUNT), prepayment.getValue(LbSoapService.PREPAYMENT_PAY_DATE),
 					prepayment.getLong(LbSoapService.PREPAYMENT_STATUS),
 					getStatus(prepayment.getLong(LbSoapService.PREPAYMENT_STATUS)));
 			// get account info
 			ServiceResponse response = lbapi.getAccount(CodeExternType.AGRM_ID,
 					prepayment.getValue(LbSoapService.AGREEMENT_ID).toString());
 			if (response.isSuccess()) {
-				LOG.info("Account Info by orderNumber:{} -- argeement:{}, balance:{}, name:[{}], phone:[{}], email:[{}]",
+				LOG.debug("Account Info by order:{} -- argeement:{}, balance:{}, name:[{}], phone:[{}], email:[{}]",
 						orderNumber,
 						keys(response.getValues(), prepayment.getValue(LbSoapService.AGREEMENT_ID)).findFirst().get(),
 						response.getValue(LbSoapService.TOTAL_BALANCE), response.getString(LbSoapService.NAME),
 						response.getString(LbSoapService.PHONE), response.getString(LbSoapService.EMAIL));
-				// add account info to prepayment response 
-				Map<String,Object> values = prepayment.getValues();
+				// add account info to prepayment response
+				Map<String, Object> values = prepayment.getValues();
+				values.put(LbSoapService.AGREEMENT,
+						keys(response.getValues(), prepayment.getValue(LbSoapService.AGREEMENT_ID)).findFirst().get());
+				values.put(LbSoapService.NAME, response.getString(LbSoapService.NAME));
+				values.put(LbSoapService.TOTAL_BALANCE, response.getValue(LbSoapService.TOTAL_BALANCE));
 				values.put(LbSoapService.PHONE, response.getString(LbSoapService.PHONE));
-				values.put(LbSoapService.EMAIL, response.getString(LbSoapService.EMAIL));	
+				values.put(LbSoapService.EMAIL, response.getString(LbSoapService.EMAIL));
 			}
 			return prepayment;
 		}
-		LOG.error("Prepayment orderNumber:{} not found", orderNumber);
+		LOG.error("Prepayment order:{} not found", orderNumber);
 		return null;
 	}
 
 	@Handler
 	public int processPayment(@Header("orderNumber") Long orderNumber, @Header("mdOrder") String receipt) {
-		LOG.info("Processing payment orderNumber:{}, receipt:{}", orderNumber, receipt);
+		LOG.info("Processing payment order:{}, receipt:{}", orderNumber, receipt);
 
 		if (!lbapi.connect()) {
 			return StatusCodes.SERVICE_UNAVAILABLE;
@@ -80,13 +83,13 @@ public class SberCallbackService {
 
 		// validate prepayment status
 		if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_PROCESSED) {
-			LOG.warn("Payment already processed for orderNumber:{}", orderNumber);
+			LOG.warn("Payment order:{} was processed", orderNumber);
 			lbapi.disconnect();
 			return StatusCodes.OK;
 		}
 
 		if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_CANCELED) {
-			LOG.error("Payment fail for orderNumber:{} - prepayment canceled [{}]", orderNumber,
+			LOG.error("Payment order:{} was canceled [{}]", orderNumber,
 					prepayment.getValue(LbSoapService.PREPAYMENT_CANCEL_DATE));
 			lbapi.disconnect();
 			return StatusCodes.OK;
@@ -97,14 +100,17 @@ public class SberCallbackService {
 				(Double) prepayment.getValue(LbSoapService.AMOUNT), receipt);
 
 		if (payment.isSuccess()) {
-			LOG.info("Payment success for orderNumber:{}, amount:{}", orderNumber,
-					prepayment.getValue(LbSoapService.AMOUNT));
+			LOG.info("Success payment order:{}, amount:{}, agreement:{}, name:[{}], balance:{}, phone:{}, email:[{}]",
+					orderNumber, prepayment.getValue(LbSoapService.AMOUNT),
+					prepayment.getValue(LbSoapService.AGREEMENT), prepayment.getValue(LbSoapService.NAME),
+					prepayment.getValue(LbSoapService.TOTAL_BALANCE), prepayment.getValue(LbSoapService.PHONE),
+					prepayment.getValue(LbSoapService.EMAIL));
 			lbapi.disconnect();
-			
+
 			// process fiscal receipt
 			dreamkas.fiscalization(((Double) prepayment.getValue(LbSoapService.AMOUNT)).longValue(),
 					prepayment.getString(LbSoapService.PHONE), prepayment.getString(LbSoapService.EMAIL));
-			
+
 			return StatusCodes.OK;
 		}
 
@@ -116,7 +122,7 @@ public class SberCallbackService {
 
 	@Handler
 	public int processRefund(@Header("orderNumber") Long orderNumber, @Header("mdOrder") String receipt) {
-		LOG.info("Processing refund orderNumber:{}, receipt:{}", orderNumber, receipt);
+		LOG.info("Processing refund order:{}, receipt:{}", orderNumber, receipt);
 
 		if (!lbapi.connect()) {
 			return StatusCodes.SERVICE_UNAVAILABLE;
@@ -135,8 +141,12 @@ public class SberCallbackService {
 			ServiceResponse response = lbapi.cancelPayment(prepayment.getString(LbSoapService.RECEIPT));
 			lbapi.disconnect();
 			if (response.isSuccess()) {
-				LOG.info("Success refund payment orderNumber:{}, amount:{}", orderNumber,
-						prepayment.getValue(LbSoapService.AMOUNT));
+				LOG.info(
+						"Success refund order:{}, amount:{}, agreement:{}, name:[{}], balance:{}, phone:{}, email:[{}]",
+						orderNumber, prepayment.getValue(LbSoapService.AMOUNT),
+						prepayment.getValue(LbSoapService.AGREEMENT), prepayment.getValue(LbSoapService.NAME),
+						prepayment.getValue(LbSoapService.TOTAL_BALANCE), prepayment.getValue(LbSoapService.PHONE),
+						prepayment.getValue(LbSoapService.EMAIL));
 				return StatusCodes.OK;
 			}
 			if (response.isFault()) {
@@ -148,10 +158,10 @@ public class SberCallbackService {
 			ServiceResponse response = lbapi.cancelPrePayment(orderNumber);
 			lbapi.disconnect();
 			if (!response.isSuccess()) {
-				LOG.error("Refunded payment not found. Error cancel prepayment orderNumber:{}", orderNumber);
+				LOG.error("Refunded payment not found. Error cancel prepayment order:{}", orderNumber);
 				return StatusCodes.NOT_ACCEPTABLE;
 			}
-			LOG.warn("Refunded payment not found. Cancel prepayment orderNumber:{}", orderNumber);
+			LOG.warn("Refunded payment not found. Cancel prepayment order:{}", orderNumber);
 			return StatusCodes.OK;
 		}
 	}
@@ -159,7 +169,7 @@ public class SberCallbackService {
 	@Handler
 	public int cancelPrePayment(@Header("orderNumber") Long orderNumber, @Header("operation") String operation,
 			@Header("mdOrder") String receipt) {
-		LOG.info("Processing cancel operation:{}, orderNumber:{}, receipt:{}", operation, orderNumber, receipt);
+		LOG.info("Processing cancel operation:{}, order:{}, receipt:{}", operation, orderNumber, receipt);
 
 		if (!lbapi.connect()) {
 			return StatusCodes.SERVICE_UNAVAILABLE;
@@ -172,15 +182,21 @@ public class SberCallbackService {
 			return StatusCodes.NOT_FOUND;
 		}
 
+		if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_PROCESSED) {
+			LOG.warn("Payment order:{} was processed", orderNumber);
+			lbapi.disconnect();
+			return StatusCodes.OK;
+		}
+		
 		if (prepayment.getLong(LbSoapService.PREPAYMENT_STATUS) == LbSoapService.STATUS_CANCELED) {
-			LOG.warn("Prepayment orderNumber:{} already canceled [{}]", orderNumber,
+			LOG.warn("Prepayment order:{} was canceled [{}]", orderNumber,
 					prepayment.getString(LbSoapService.PREPAYMENT_CANCEL_DATE));
 			lbapi.disconnect();
 			return StatusCodes.OK;
 		}
 
 		if (operation.equalsIgnoreCase("deposited")) {
-			LOG.warn("Received unsuccess deposited -- do nothing, waiting to success.");
+			LOG.warn("Received cancel deposited -- do nothing, waiting to success.");
 			lbapi.disconnect();
 			return StatusCodes.OK;
 		}
@@ -189,10 +205,14 @@ public class SberCallbackService {
 		ServiceResponse response = lbapi.cancelPrePayment(orderNumber);
 		lbapi.disconnect();
 		if (!response.isSuccess()) {
-			LOG.error("Error cancel prepayment orderNumber:{}", orderNumber);
+			LOG.error("Error cancel prepayment order:{}", orderNumber);
 			return StatusCodes.NOT_ACCEPTABLE;
 		}
-		LOG.info("Prepayment success canceled orderNumber:{}", orderNumber);
+		LOG.info("Canceled by {} order:{}, amount:{}, agreement:{}, name:[{}], balance:{}, phone:{}, email:[{}]",
+				operation, orderNumber, prepayment.getValue(LbSoapService.AMOUNT),
+				prepayment.getValue(LbSoapService.AGREEMENT), prepayment.getValue(LbSoapService.NAME),
+				prepayment.getValue(LbSoapService.TOTAL_BALANCE), prepayment.getValue(LbSoapService.PHONE),
+				prepayment.getValue(LbSoapService.EMAIL));
 		return StatusCodes.OK;
 	}
 
