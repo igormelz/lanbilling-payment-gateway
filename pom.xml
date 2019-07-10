@@ -11,7 +11,7 @@
 	</parent>
 	<groupId>org.openfs</groupId>
 	<artifactId>lb-pay</artifactId>
-	<version>0.0.4-SNAPSHOT</version>
+	<version>0.0.5-SNAPSHOT</version>
 	<name>LanBilling Payment Gateway</name>
 	<description>REST front-end for LanBilling payment</description>
 

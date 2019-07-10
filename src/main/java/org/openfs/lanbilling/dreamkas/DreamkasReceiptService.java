@@ -5,6 +5,8 @@ import java.util.Map;
 
 import org.apache.camel.CamelExecutionException;
 import org.apache.camel.EndpointInject;
+import org.apache.camel.Handler;
+import org.apache.camel.Header;
 import org.apache.camel.ProducerTemplate;
 import org.openfs.lanbilling.dreamkas.model.Receipt;
 import org.slf4j.Logger;
@@ -13,13 +15,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Service;
 
-@Service
+@Service("dreamkasReceipt")
 @Configuration
 public class DreamkasReceiptService {
 	private static final Logger LOG = LoggerFactory.getLogger(DreamkasReceiptService.class);
-
-	@Value("${dreamkas.enable:false}")
-	private boolean isEnable;
 
 	@Value("${dreamkas.deviceid}")
 	private int deviceId;
@@ -33,67 +32,49 @@ public class DreamkasReceiptService {
 	@Value("${dreamkas.token}")
 	private String token;
 
-	@EndpointInject(uri = "seda:dreamkas")
+	@EndpointInject(uri = "seda:dreamkasRegisterReceipt")
 	ProducerTemplate producer;
 
-	public DreamkasReceiptService() {
-	}
-
-	@SuppressWarnings("unchecked")
-	public void fiscalization(Long amount, String phone, String email) {
-
-		if (!isEnable) {
-			return;
-		}
-
-		LOG.info("Processing fiscalization service:[{}], amount:{}, phone:{}, email:{}", serviceName, amount, phone,
-				email);
+	@Handler
+	public void register(@Header("orderNumber") long orderNumber, @Header("amount") long amount, @Header("phone") String phone, @Header("email") String email)  {
+		LOG.info("Processing register receipt order:{}, service:[{}], amount:{}, phone:{}, email:{}", orderNumber,
+				serviceName, amount, phone, email);
 
 		// create receipt request with no_tax and card payment
 		Receipt.Builder builder = Receipt.builder(deviceId, taxmode).addNoTaxServicePosition(serviceName, amount)
 				.addCardPayment(amount);
+		
 		// add attributes
 		boolean attr = false;
 		if (phone != null && !phone.isEmpty() && phone.matches("^\\+?[1-9]\\d{10,13}+$")) {
 			// fix leading plus
 			builder.addPhoneAttribute((phone.startsWith("+")) ? phone : "+" + phone);
-			LOG.info("Add receipt attr phone:{}", phone);
+			LOG.debug("Add receipt attr phone:{}", phone);
 			attr = true;
 		}
+		
 		if (email != null && !email.isEmpty()
 				&& email.matches("^([a-zA-Z0-9_\\-\\.]+)@([a-zA-Z0-9_\\-\\.]+)\\.([a-zA-Z]{2,5})$")) {
 			builder.addEmailAttribute(email);
-			LOG.info("Add receipt attr email:{}", email);
+			LOG.debug("Add receipt attr email:{}", email);
 			attr = true;
 		}
+		
 		if (!attr) {
-			LOG.error("No receipt attributes (phone or email) defined");
+			LOG.error("Fail register receipt order:{} - phone or email is not defined", orderNumber);
 			return;
 		}
-		// call api
+		
+		// register receipt
+		Map<String,Object> headers = new HashMap<String,Object>(4);
+		headers.put("Content-Type", "application/json");
+		headers.put("Content-Encoding", "utf-8");
+		headers.put("Authorization", "Bearer " + token);
+		headers.put("CamelHttpMethod", "POST");
 		try {
-			Map<String, Object> requestHeaders = new HashMap<>();
-			requestHeaders.put("Content-Type", "application/json");
-			requestHeaders.put("Content-Encoding", "utf-8");
-			requestHeaders.put("Authorization", "Bearer " + token);
-			requestHeaders.put("CamelHttpMethod", "POST");
-			Object response = producer.requestBodyAndHeaders(builder.buildSaleReceipt(), requestHeaders);
-			if (response == null) {
-				LOG.error("Call to dreamkas has no response");
-			} else if (response instanceof Map) {
-				Map<String, Object> answer = (Map<String, Object>) response;
-				if (answer.containsKey("status") && !answer.containsKey("id")) {
-					LOG.error("Return error status:{}, message:{}", answer.get("status"), answer.get("message"));
-				} else {
-					LOG.info("Receipt accepted to fiscalization: id:{}, status:{}", answer.get("id"),
-							answer.get("status"));
-				}
-			} else {
-				LOG.error("Receive unknown answer");
-			}
+			producer.sendBodyAndHeaders(builder.buildSaleReceipt(),headers);			
 		} catch (CamelExecutionException e) {
-			LOG.error("Call Api got exception:{}", e.getMessage());
-			return;
+			LOG.error("Fail register receipt order:{} - {}", orderNumber, e.getMessage());
 		}
 	}
 

@@ -5,6 +5,7 @@ import java.util.Map;
 import javax.xml.ws.soap.SOAPFaultException;
 
 import org.apache.camel.Exchange;
+import org.apache.camel.ExchangePattern;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.fastjson.FastjsonDataFormat;
@@ -15,6 +16,7 @@ import org.apache.camel.http.common.cookie.InstanceCookieHandler;
 import org.apache.camel.model.rest.RestBindingMode;
 import org.apache.camel.processor.validation.PredicateValidationException;
 import org.apache.camel.util.jsse.SSLContextParameters;
+import org.openfs.lanbilling.dreamkas.DreamkasLogError;
 import org.openfs.lanbilling.dreamkas.model.Receipt;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -73,7 +75,8 @@ public class PaymentGatewayApplication {
 							.validate(header("status").in("0","1"))
 							.choice()
 								.when(and(header("status").isEqualTo("1"),header("operation").isEqualTo("deposited")))
-									.setHeader(Exchange.HTTP_RESPONSE_CODE,method("sberCallback","processPayment"))
+									//.setHeader(Exchange.HTTP_RESPONSE_CODE,method("sberCallback","processPayment"))
+									.to("direct:doPayment")
 								.when(and(header("status").isEqualTo("1"),header("operation").isEqualTo("approved")))
 									.setHeader(Exchange.HTTP_RESPONSE_CODE,constant(200))
 								.when(and(header("status").isEqualTo("1"),header("operation").in("refunded","reversed")))
@@ -123,11 +126,23 @@ public class PaymentGatewayApplication {
 				rest("/dreamkas")
 					.bindingMode(RestBindingMode.off)
 					.post()
-						.route().id("ProcessDreamkasCallback")
+						.route().id("DreamkasCallback")
 						.unmarshal(formatMap)
 						.process("dreamkasCallback")
 					.endRest();
 
+				// Sberbank process payment 
+				from("direct:doPayment").id("doPayment")
+					// process payment on LB
+					.bean("sberCallback","processPayment")
+					// if payment success and return amount 
+					.filter(and(header(Exchange.HTTP_RESPONSE_CODE).isEqualTo(200),header("amount").isNotNull()))
+						.setExchangePattern(ExchangePattern.InOnly)
+						.bean("dreamkasReceipt","register")
+					.end()
+				.setBody(constant(""));
+					
+				
 				// Sberbank Register Order 
 				from("direct:sberRegisterOrder").id("SberRegisterOrder")
 					.onException(Exception.class)
@@ -154,27 +169,26 @@ public class PaymentGatewayApplication {
 					.setHeader(Exchange.HTTP_METHOD).constant("POST")
 					.to("undertow:http://{{lbcore}}?throwExceptionOnFailure=false&cookieHandler=#cookieHandler")
 					.filter(header(Exchange.HTTP_RESPONSE_CODE).isNotEqualTo(200))
-						// convert error response to string
 						.transform(xpath("//detail/text()", String.class))
 					.end()
 					.filter(header(Exchange.HTTP_RESPONSE_CODE).isEqualTo(200))
-						// convert success soap message to pojo
 						.unmarshal(lbsoap)
 					.end();
 
-				// Dreamkas Receipts
-				from("seda:dreamkas").id("DreamkasReceiptsBackend").autoStartup("{{dreamkas.enable}}")
-					.onException(Exception.class)
-						.handled(true)
-						.log(LoggingLevel.ERROR, "failed with exception")
-					.end()
+				// Dreamkas API register receipt
+				from("seda:dreamkasRegisterReceipt").id("DreamkasRegisterReceipt")
+					.errorHandler(defaultErrorHandler()
+							.useExponentialBackOff()
+							.maximumRedeliveries(3)
+							.redeliveryDelay(3000)
+							.onExceptionOccurred(new DreamkasLogError())
+							.asyncDelayedRedelivery()
+							.useOriginalMessage())
 					.marshal(formatReceipt)
-					.log("request:${body}")
-					.to("undertow:https://kabinet.dreamkas.ru/api/receipts?throwExceptionOnFailure=false&sslContextParameters=#sslContext")
-					.filter(header(Exchange.HTTP_RESPONSE_CODE).isNotEqualTo(202))
-						.log(LoggingLevel.ERROR,"Return unsuccess: ${body}")
-					.end()
-					.unmarshal(formatMap);
+					.log("Build receipt:${body}")
+					.to("undertow:{{dreamkas.Url}}?sslContextParameters=#sslContext")
+					.unmarshal(formatMap)
+					.log("Success register receipt:${body[id]}, status:${body[status]}");
 
 			}
 		};
