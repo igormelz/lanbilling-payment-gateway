@@ -36,13 +36,13 @@ public class DreamkasReceiptService {
 	ProducerTemplate producer;
 
 	@Handler
-	public void register(@Header("orderNumber") long orderNumber, @Header("amount") double amount, @Header("phone") String phone, @Header("email") String email)  {
-		LOG.info("Processing register receipt order:{}, service:[{}], amount:{}, phone:{}, email:{}", orderNumber,
-				serviceName, amount, phone, email);
+	public void register(@Header("orderNumber") long orderNumber, @Header("mdOrder") String mdOrder, @Header("amount") double amount, @Header("phone") String phone, @Header("email") String email)  {
+		LOG.info("Processing register receipt order:{}, mdOrder:[{}], amount:{}, phone:{}, email:{}", orderNumber,
+				mdOrder, amount, phone, email);
 
 		long service_price = (long) (amount * 100);
 		// create receipt request with no_tax and card payment
-		Receipt.Builder builder = Receipt.builder(deviceId, taxmode).addNoTaxServicePosition(serviceName, service_price)
+		Receipt.Builder builder = Receipt.builder(deviceId, taxmode, mdOrder).addNoTaxServicePosition(serviceName, service_price)
 				.addCardPayment(service_price);
 		
 		// add attributes

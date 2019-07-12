@@ -40,6 +40,7 @@ public class Receipt {
 	public final static String PAYMENT_CREDIT = "CREDIT";
 	public final static String PAYMENT_CONSIDERATION = "CONSIDERATION";
 
+	private String externalId;
 	private int deviceId;
 	private String type;
 	private int timeout = 5;
@@ -49,6 +50,14 @@ public class Receipt {
 	private ReceiptFfdTag[] tags;
 	private ReceiptAttributes attributes;
 	private ReceiptTotal total;
+
+	public String getExternalId() {
+		return externalId;
+	}
+
+	public void setExternalId(String externalId) {
+		this.externalId = externalId;
+	}
 
 	public int getDeviceId() {
 		return deviceId;
@@ -122,20 +131,22 @@ public class Receipt {
 		this.total = total;
 	}
 
-	public static Builder builder(int deviceId, String taxmode) {
-		return new Builder(deviceId, taxmode);
+	public static Builder builder(int deviceId, String taxmode, String externalId) {
+		return new Builder(deviceId, taxmode, externalId);
 	}
 
 	public static final class Builder {
+		private final String externalId;
 		private final int deviceId;
 		private final String taxMode;
 		private final List<ReceiptPosition> positions = new ArrayList<>();
 		private final List<ReceiptPayment> payments = new ArrayList<>();
 		private ReceiptAttributes attributes;
 
-		Builder(final int deviceId, final String taxMode) {
+		Builder(final int deviceId, final String taxMode, final String externalId) {
 			this.deviceId = deviceId;
 			this.taxMode = taxMode;
+			this.externalId = externalId;
 		}
 
 		public Builder addPosition(ReceiptPosition position) {
@@ -187,6 +198,7 @@ public class Receipt {
 
 		public Receipt buildSaleReceipt() {
 			Receipt receipt = new Receipt();
+			receipt.setExternalId(externalId);
 			receipt.setDeviceId(deviceId);
 			receipt.setType(OPERATION_SALE);
 			receipt.setTaxMode(taxMode);
