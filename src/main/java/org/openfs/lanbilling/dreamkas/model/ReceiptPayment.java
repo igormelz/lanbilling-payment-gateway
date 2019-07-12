@@ -5,7 +5,7 @@ public class ReceiptPayment {
 	private final String type;
 
 	public ReceiptPayment(long amount, String type) {
-		this.sum = amount * 100;
+		this.sum = amount;
 		this.type = type;
 	}
 	

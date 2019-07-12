@@ -11,12 +11,13 @@ import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.fastjson.FastjsonDataFormat;
 import org.apache.camel.dataformat.soap.SoapJaxbDataFormat;
 import org.apache.camel.dataformat.soap.name.ServiceInterfaceStrategy;
+import org.apache.camel.http.common.HttpOperationFailedException;
 import org.apache.camel.http.common.cookie.CookieHandler;
 import org.apache.camel.http.common.cookie.InstanceCookieHandler;
+import org.apache.camel.model.dataformat.JsonLibrary;
 import org.apache.camel.model.rest.RestBindingMode;
 import org.apache.camel.processor.validation.PredicateValidationException;
 import org.apache.camel.util.jsse.SSLContextParameters;
-import org.openfs.lanbilling.dreamkas.DreamkasLogError;
 import org.openfs.lanbilling.dreamkas.model.Receipt;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -177,17 +178,19 @@ public class PaymentGatewayApplication {
 
 				// Dreamkas API register receipt
 				from("seda:dreamkasRegisterReceipt").id("DreamkasRegisterReceipt")
-					.errorHandler(defaultErrorHandler()
-							.useExponentialBackOff()
-							.maximumRedeliveries(3)
-							.redeliveryDelay(3000)
-							.onExceptionOccurred(new DreamkasLogError())
-							.asyncDelayedRedelivery()
-							.useOriginalMessage())
+					.onException(HttpOperationFailedException.class)
+						.useExponentialBackOff()
+						.maximumRedeliveries(3)
+						.redeliveryDelay(15000)
+						.retryAttemptedLogLevel(LoggingLevel.WARN)
+						//.onExceptionOccurred(new DreamkasLogError())
+						//.asyncDelayedRedelivery()
+						.useOriginalMessage()
+					.end()
 					.marshal(formatReceipt)
 					.log("Build receipt:${body}")
 					.to("undertow:{{dreamkas.Url}}?sslContextParameters=#sslContext")
-					.unmarshal(formatMap)
+					.unmarshal().json(JsonLibrary.Fastjson)
 					.log("Success register receipt:${body[id]}, status:${body[status]}");
 
 			}

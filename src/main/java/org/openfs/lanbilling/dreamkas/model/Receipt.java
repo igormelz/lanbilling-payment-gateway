@@ -147,8 +147,8 @@ public class Receipt {
 			ReceiptPosition pos = new ReceiptPosition(name);
 			pos.setType(GOODS_SERVICE);
 			pos.setQuantity(1);
-			pos.setPrice(price * 100);
-			pos.setPriceSum(price * 100);
+			pos.setPrice(price);
+			pos.setPriceSum(price);
 			pos.setTax(NDS_NO_TAX);
 			this.positions.add(pos);
 			return this;

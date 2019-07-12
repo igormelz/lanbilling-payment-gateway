@@ -36,13 +36,14 @@ public class DreamkasReceiptService {
 	ProducerTemplate producer;
 
 	@Handler
-	public void register(@Header("orderNumber") long orderNumber, @Header("amount") long amount, @Header("phone") String phone, @Header("email") String email)  {
+	public void register(@Header("orderNumber") long orderNumber, @Header("amount") double amount, @Header("phone") String phone, @Header("email") String email)  {
 		LOG.info("Processing register receipt order:{}, service:[{}], amount:{}, phone:{}, email:{}", orderNumber,
 				serviceName, amount, phone, email);
 
+		long service_price = (long) (amount * 100);
 		// create receipt request with no_tax and card payment
-		Receipt.Builder builder = Receipt.builder(deviceId, taxmode).addNoTaxServicePosition(serviceName, amount)
-				.addCardPayment(amount);
+		Receipt.Builder builder = Receipt.builder(deviceId, taxmode).addNoTaxServicePosition(serviceName, service_price)
+				.addCardPayment(service_price);
 		
 		// add attributes
 		boolean attr = false;
@@ -61,7 +62,7 @@ public class DreamkasReceiptService {
 		}
 		
 		if (!attr) {
-			LOG.error("Fail register receipt order:{} - phone or email is not defined", orderNumber);
+			LOG.error("Fail build receipt order:{} - phone or email is not defined", orderNumber);
 			return;
 		}
 		

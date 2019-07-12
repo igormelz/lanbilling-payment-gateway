@@ -124,7 +124,7 @@ public class SberCallbackService {
 //					prepayment.getString(LbSoapService.PHONE), prepayment.getString(LbSoapService.EMAIL));
 
 			// return success with body as map parameters
-			message.setHeader("amount", ((Double) prepayment.getValue(LbSoapService.AMOUNT)).longValue());
+			message.setHeader("amount", prepayment.getValue(LbSoapService.AMOUNT));
 			message.setHeader("phone", prepayment.getString(LbSoapService.PHONE));
 			message.setHeader("email", prepayment.getString(LbSoapService.EMAIL));
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE,StatusCodes.OK);
