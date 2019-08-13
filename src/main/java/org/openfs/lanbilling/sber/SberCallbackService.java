@@ -1,6 +1,5 @@
 package org.openfs.lanbilling.sber;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
 
@@ -11,7 +10,6 @@ import org.apache.camel.Message;
 import org.openfs.lanbilling.LbSoapService;
 import org.openfs.lanbilling.LbSoapService.CodeExternType;
 import org.openfs.lanbilling.LbSoapService.ServiceResponse;
-import org.openfs.lanbilling.dreamkas.DreamkasReceiptService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;

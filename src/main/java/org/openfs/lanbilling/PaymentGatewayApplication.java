@@ -130,6 +130,12 @@ public class PaymentGatewayApplication {
 						.route().id("DreamkasCallback")
 						.unmarshal(formatMap)
 						.process("dreamkasCallback")
+						// update in db
+						.filter(body().isNotNull())
+							.to("jdbc:dataSource")
+						.end()
+						// empty response
+						.setBody(constant(""))
 					.endRest();
 
 				// Sberbank process payment 
@@ -139,6 +145,16 @@ public class PaymentGatewayApplication {
 					// if payment success and return amount 
 					.filter(and(header(Exchange.HTTP_RESPONSE_CODE).isEqualTo(200),header("amount").isNotNull()))
 						.setExchangePattern(ExchangePattern.InOnly)
+						// save order in db 
+						.setBody(simple("insert into receipts set "
+								+ "orderNumber=${header.orderNumber},"
+								+ "mdOrder='${header.mdOrder}',"
+								+ "amount=${header.amount},"
+								+ "email='${header.email}',"
+								+ "phone='${header.phone}',"
+								+ "createDate='${date:now:yyyy-MM-dd HH:mm:ss}'"))
+						.to("jdbc:dataSource")
+						// register receipt 
 						.bean("dreamkasReceipt","register")
 					.end()
 				.setBody(constant(""));
@@ -188,10 +204,18 @@ public class PaymentGatewayApplication {
 						.useOriginalMessage()
 					.end()
 					.marshal(formatReceipt)
-					.log("Build receipt:${body}")
+					.log("Build receipt request:${body}")
 					.to("undertow:{{dreamkas.Url}}?sslContextParameters=#sslContext")
 					.unmarshal().json(JsonLibrary.Fastjson)
-					.log("Success register receipt:${body[id]}, status:${body[status]}");
+					.log("Success register receipt request: mdOrder:${body[externalId]}, op_id:${body[id]}, op_status:${body[status]}")
+					// update receipt status 
+					.setBody(simple("update receipts set "
+							+ "operationStatus='${body[status]}',"
+							+ "operationDate='${body[createdAt]}',"
+							+ "operationId='${body[id]}' "
+							+ "where mdOrder='${body[externalId]}'"))
+					.to("jdbc:dataSource")
+					;
 
 			}
 		};
