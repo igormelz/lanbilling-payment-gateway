@@ -138,6 +138,34 @@ public class PaymentGatewayApplication {
 						.setBody(constant(""))
 					.endRest();
 
+				// manual register receipt 
+				rest("/receipt/")
+					.bindingMode(RestBindingMode.off)
+					.get("/reprocessing/{orderNumber}")
+						.route().id("Register orderNumber from DB")
+							// check if receipt is error 
+							.setBody(simple("select mdOrder,amount,phone,email from receipts where orderNumber=${header.orderNumber} and operationStatus = 'ERROR'"))
+							.to("jdbc:dataSource")
+							.to("log:DEBUG?showHeaders=true")
+							.filter(header("CamelJdbcRowCount").isGreaterThan(0))
+								// fill headers 
+								.setHeader(Exchange.HTTP_RESPONSE_CODE,constant(200))
+								.setHeader("mdOrder",simple("${body[0][mdOrder]}"))
+								.setHeader("amount",simple("${body[0][amount]}"))
+								.setHeader("phone",simple("${body[0][phone]}"))
+								.setHeader("email",simple("${body[0][email]}"))
+								.log("Reprocessing orderNumber:${header.orderNumber}")
+								.to("log:DEBUG?showHeaders=true")
+								.setBody(constant(""))
+								// register receipt 
+								.bean("dreamkasReceipt","register")
+							.end()
+							.filter(header("CamelJdbcRowCount").isEqualTo(0))
+								.setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400))
+								.setBody(constant("ORDER NUMBER NOT FOUND"))
+							.end()
+						.endRest();
+				
 				// Sberbank process payment 
 				from("direct:doPayment").id("doPayment")
 					// process payment on LB

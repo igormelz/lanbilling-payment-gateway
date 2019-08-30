@@ -40,7 +40,7 @@ public class DreamkasCallbackService implements Processor {
 			String opTime = (operation.getCompletedAt() != null) ? operation.getCompletedAt()
 					: operation.getCreatedAt();
 			if (operation.getStatus().equalsIgnoreCase(Operation.ERROR) && operation.getData() != null) {
-				LOG.error("Register receipt op_id:{} op_type:{} -- {}", operation.getId(), operation.getType(),
+				LOG.error("Register receipt mdOrder:{}, op_id:{} op_type:{} -- {}", operation.getExternalId(), operation.getId(), operation.getType(),
 						operation.getData().getError().getCode());
 				// return update sql
 				message.setBody("update receipts set operationStatus='ERROR',operationDate='" + opTime
@@ -48,7 +48,7 @@ public class DreamkasCallbackService implements Processor {
 						+ operation.getData().getError().getMessage() + "' where operationId='" + operation.getId()
 						+ "'");
 			} else {
-				LOG.info("Register receipt op_id:{}, op_type:{}, op_status:{}", operation.getId(), operation.getType(),
+				LOG.info("Register receipt mdOrder:{}, op_id:{}, op_type:{}, op_status:{}", operation.getExternalId(), operation.getId(), operation.getType(),
 						operation.getStatus());
 				// return update sql
 				message.setBody("update receipts set operationStatus='" + operation.getStatus() + "',operationDate='"

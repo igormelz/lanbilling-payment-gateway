@@ -7,6 +7,7 @@ public class Operation {
 	public static final String ERROR = "ERROR";
 	
 	private String id;
+	private String externalId;
 	private String createdAt;
 	private String type;
 	private String completedAt;
@@ -21,6 +22,14 @@ public class Operation {
 
 	public void setId(String id) {
 		this.id = id;
+	}
+
+	public String getExternalId() {
+		return externalId;
+	}
+
+	public void setExternalId(String externalId) {
+		this.externalId = externalId;
 	}
 
 	public String getCreatedAt() {
