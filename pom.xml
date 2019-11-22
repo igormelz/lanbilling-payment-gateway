@@ -9,9 +9,9 @@
 		<version>2.1.4.RELEASE</version>
 		<relativePath /> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>org.openfs</groupId>
+	<groupId>ru.openfs</groupId>
 	<artifactId>lb-pay</artifactId>
-	<version>0.0.7-SNAPSHOT</version>
+	<version>0.0.8-SNAPSHOT</version>
 	<name>LanBilling Payment Gateway</name>
 	<description>REST front-end for LanBilling payment</description>
 
@@ -51,17 +51,19 @@
 			<groupId>org.apache.camel</groupId>
 			<artifactId>camel-soap</artifactId>
 		</dependency>
-		<dependency>
+	
+		<!-- <dependency>
 			<groupId>org.apache.camel</groupId>
 			<artifactId>camel-jacksonxml</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.camel</groupId>
 			<artifactId>camel-jaxb</artifactId>
-		</dependency>
+		</dependency> -->
+	
 		<dependency>
 			<groupId>org.apache.camel</groupId>
-			<artifactId>camel-fastjson-starter</artifactId>
+			<artifactId>camel-jackson-starter</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
