@@ -12,20 +12,20 @@ public class DreamkasCleanupCustomerRoute extends RouteBuilder {
     @Override
     public void configure() throws Exception {
 
-        //
+        // cleanup clients on kabinet.dreamkas
         from("timer:cleanup?period={{dreamkas.cleanup.period}}").autoStartup("{{dreamkas.cleanup.enable}}")
             .setHeader("Authorization",constant("Bearer {{dreamkas.token}}"))
-            .to("undertow:{{dreamkas.apiUrl}}/clients?throwExceptionOnFailure=false&sslContextParameters=#sslContext&keepAlive=false")
-            //.unmarshal().json(JsonLibrary.Jackson)
-            //.to("log:INFO?showHeaders=true")
+            .setHeader(Exchange.HTTP_PATH, constant("/api/clients"))
+            .to("undertow:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             .split().jsonpath("$.[*].id")
                 .log("Cleanup clientId:${body}")
                 .setHeader("id", body())
                 .removeHeaders("Content.*")
                 .setHeader("Authorization",constant("Bearer {{dreamkas.token}}"))
                 .setHeader(Exchange.HTTP_METHOD,constant("DELETE"))
+                .setHeader(Exchange.HTTP_PATH, simple("/api/clients/${header.id}"))
                 .setBody(constant(""))
-                .toD("undertow:{{dreamkas.apiUrl}}/clients/${header.id}?throwExceptionOnFailure=false&sslContextParameters=#sslContext")
+                .to("undertow:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             .end();
     }
 
