@@ -28,8 +28,8 @@ public class PaymentGatewayApplication {
 			@Override
 			public void configure() throws Exception {
 
-				restConfiguration().component("undertow").host("localhost").port("{{port}}").contextPath("/pay")
-				.dataFormatProperty("com.fasterxml.jackson.databind.SerializationFeature.disableFeatures","WRITE_NULL_MAP_VALUES");
+				restConfiguration().component("undertow").host("localhost").port("{{port}}").contextPath("/pay");
+				//.dataFormatProperty("com.fasterxml.jackson.databind.SerializationFeature.disableFeatures","WRITE_NULL_MAP_VALUES");
 
 			}
 

@@ -30,8 +30,7 @@ public class DreamkasClientRoute extends RouteBuilder {
             .marshal(receipt)
             .log("Build receipt:${body}")
             // submit receipt
-            // old: .to("undertow:{{dreamkas.Url}}?sslContextParameters=#sslContext")
-            .to("undertow:{{dreamkas.Url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
+            .to("undertow:{{dreamkas.apiUrl}}/receipts?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             // on success response register operation  
             .unmarshal(operation)
             .log("Receipt mdOrder:${body.externalId}, operation:${body.id} [${body.status}]")
