@@ -1,7 +1,5 @@
 package ru.openfs.lbpay.dreamkas;
 
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.camel.CamelExecutionException;
 import org.apache.camel.EndpointInject;
 import org.apache.camel.Handler;
@@ -93,13 +91,8 @@ public class DreamkasReceiptService {
 		}
 
 		// register receipt
-		Map<String, Object> headers = new HashMap<String, Object>(4);
-		headers.put("Content-Type", "application/json");
-		headers.put("Content-Encoding", "utf-8");
-		headers.put("Authorization", "Bearer " + token);
-		headers.put("CamelHttpMethod", "POST");
 		try {
-			producer.sendBodyAndHeaders(builder.buildReceipt(), headers);
+			producer.sendBody(builder.buildReceipt());
 		} catch (CamelExecutionException e) {
 			LOG.error("Fail register receipt order:{} - {}", orderNumber, e.getMessage());
 		}

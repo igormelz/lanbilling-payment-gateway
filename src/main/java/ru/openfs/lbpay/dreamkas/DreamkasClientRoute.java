@@ -1,5 +1,6 @@
 package ru.openfs.lbpay.dreamkas;
 
+import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.jackson.JacksonDataFormat;
@@ -29,9 +30,13 @@ public class DreamkasClientRoute extends RouteBuilder {
             // convert to json 
             .marshal(receipt)
             .log("Build receipt:${body}")
+            .setHeader(Exchange.HTTP_PATH, constant("/api/receipts"))
+            .setHeader(Exchange.CONTENT_TYPE, constant("application/json"))
+            .setHeader(Exchange.CONTENT_ENCODING, constant("utf-8"))
+            .setHeader(Exchange.HTTP_METHOD,constant("POST"))
+            .setHeader("Authorization",constant("Bearer {{dreamkas.token}}"))
             // submit receipt
-            // old: .to("undertow:{{dreamkas.Url}}?sslContextParameters=#sslContext")
-            .to("undertow:{{dreamkas.Url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
+            .to("undertow:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             // on success response register operation  
             .unmarshal(operation)
             .log("Receipt mdOrder:${body.externalId}, operation:${body.id} [${body.status}]")

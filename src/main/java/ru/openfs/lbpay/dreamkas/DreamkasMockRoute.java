@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.UUID;
-import java.util.function.Supplier;
 
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
@@ -24,11 +23,13 @@ public class DreamkasMockRoute extends RouteBuilder {
     public void configure() throws Exception {
 
         JacksonDataFormat answer = new JacksonDataFormat(Operation.class);
-        Supplier<String> errorMessage = () -> {
-            return "{\"status\":400,\"code\":\"E_VALIDATION_FAILED\",\"message\":\"Ошибка валидации\",\"data\":{\"errors\":[{\"code\":\"E_VALIDATION_ARRAY_BASE\",\"message\":\"Поле `tags` должно быть массивом\"}]}}";
-        };
+        // Supplier<String> errorMessage = () -> {
+        // return "{\"status\":400,\"code\":\"E_VALIDATION_FAILED\",\"message\":\"Ошибка
+        // валидации\",\"data\":{\"errors\":[{\"code\":\"E_VALIDATION_ARRAY_BASE\",\"message\":\"Поле
+        // `tags` должно быть массивом\"}]}}";
+        // };
 
-        from("undertow:http://127.0.0.1:7001/service?httpMethodRestrict=POST&useStreaming=false")
+        from("undertow:http://127.0.0.1:7001/api/receipts?httpMethodRestrict=POST&useStreaming=false")
                 .routeId("DreamkasMockService").unmarshal().json(JsonLibrary.Jackson).log("MOCK REQ:${body}")
                 .process(new Processor() {
 
@@ -46,9 +47,14 @@ public class DreamkasMockRoute extends RouteBuilder {
 
                 }).marshal(answer).setHeader(Exchange.HTTP_RESPONSE_CODE, constant(202)).log("MOCK RES:${body}");
 
-        from("undertow:http://127.0.0.1:7001/serviceError?httpMethodRestrict=POST&useStreaming=false")
-                .routeId("DreamkasMockServiceError").setBody(errorMessage)
-                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(400)).log("MOCK ERR:${body}");
+        from("undertow:http://127.0.0.1:7001/api/clients?httpMethodRestrict=GET&useStreaming=false")
+                .routeId("DreamkasMockServiceClients")
+                .setBody(constant("[{\"id\":\"19f78eee\", \"name\":null, \"phone\":\"+12321312\", \"email\":null}]"))
+                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(200)).log("MOCK CLIENTS:${body}");
+
+        from("undertow:http://127.0.0.1:7001/api/clients/19f78eee?httpMethodRestrict=DELETE&useStreaming=false")
+                .setBody(constant(null)).setHeader(Exchange.HTTP_RESPONSE_CODE, constant(204))
+                .log("MOCK CLIENTS:DELETE:OK");
     }
 
 }
