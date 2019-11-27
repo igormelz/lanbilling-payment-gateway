@@ -101,7 +101,12 @@ public class ReceiptsDbService {
             StringBuilder sql = new StringBuilder("update receipts set operationStatus='");
             sql.append(operation.getStatus()).append("',");
             if (operation.getStatus().toString().equalsIgnoreCase("ERROR")) {
+                LOG.error("Receipt mdOrder:{}, operation:{} [{}]", operation.getExternalId(), operation.getId(),
+                        operation.getData().getError().getCode());
                 sql.append("operationMessage='").append(operation.getData().getError().getMessage()).append("',");
+            } else {
+                LOG.info("Receipt mdOrder:{}, operation:{} [{}]", operation.getExternalId(), operation.getId(),
+                        operation.getStatus());
             }
             sql.append("operationDate='").append(
                     (operation.getCompletedAt() != null) ? operation.getCompletedAt() : operation.getCreatedAt())
