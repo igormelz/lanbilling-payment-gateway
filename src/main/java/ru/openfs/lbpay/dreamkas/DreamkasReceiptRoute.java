@@ -2,7 +2,6 @@ package ru.openfs.lbpay.dreamkas;
 
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.model.rest.RestBindingMode;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -15,10 +14,6 @@ public class DreamkasReceiptRoute extends RouteBuilder {
 
 	@Override
 	public void configure() throws Exception {
-
-		// rest("/sber/online").bindingMode(RestBindingMode.xml).consumes("application/xml").produces("application/xml")
-		// .get().outType(SberOnlineResponse.class).route().routeId("ProcessSberOnline").process("sberOnline")
-		// .endRest();
 
 		// process payment fiscalization
 		from("direct:registerSaleReceipt").id("RegisterSaleReceipt")
@@ -41,8 +36,7 @@ public class DreamkasReceiptRoute extends RouteBuilder {
 			.end();
 
 		// attemp to register ERROR receipt by orderNumber
-		rest("/reprocessing/").bindingMode(RestBindingMode.off)
-			.get("/{orderNumber}").route().id("ReprocessingReceipt")
+		from("rest:get:reprocessing:/{orderNumber}").routeId("ReprocessingReceipt")
 				// lookup mdOrder on receipt db
 				.bean("audit", "getErrorReceipt")
 				// status is no success
