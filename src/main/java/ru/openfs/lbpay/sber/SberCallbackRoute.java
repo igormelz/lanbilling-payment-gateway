@@ -4,6 +4,7 @@ import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.Predicate;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.model.rest.RestBindingMode;
 import org.apache.camel.support.processor.validation.PredicateValidationException;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -32,8 +33,7 @@ public class SberCallbackRoute extends RouteBuilder {
         // approved operation
         Predicate approved = and(header("status").isEqualTo("1"), header("operation").isEqualTo("approved"));
 
-        //rest("/sber/callback").bindingMode(RestBindingMode.off).get().route().id("SberCallback")
-        from("rest:get:sber/callback").id("SberCallback")
+        rest("/sber/callback").bindingMode(RestBindingMode.off).get().route().id("SberCallback")
             // process invalid request
             .onException(PredicateValidationException.class)
                 .handled(true)

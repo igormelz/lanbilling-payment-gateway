@@ -4,6 +4,7 @@ import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.Predicate;
 import org.apache.camel.builder.RouteBuilder;
+import org.apache.camel.model.rest.RestBindingMode;
 import org.apache.camel.support.processor.validation.PredicateValidationException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -38,21 +39,24 @@ public class FormCheckoutRoute extends RouteBuilder {
         // header("amount").regex("^[1-9][0-9]{1,4}$"));
 
         // form payment endpoint
-        from("rest:get:checkout").routeId("ProcessFormValidate")
-            // processing bad request    
-            .onException(PredicateValidationException.class)
+        rest("/checkout").bindingMode(RestBindingMode.off)
+            // process validation route 
+            .get().enableCORS(true).route().routeId("ProcessFormValidate")
+                // processing bad request    
+                .onException(PredicateValidationException.class)
                 .handled(true)
                 .log(LoggingLevel.WARN, "uid:[${header.uid}]:${exception.message}").setBody(constant(""))
                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND)).end()
-            // validate request
-            .validate(agreementNumber)
-            .validate(isAgreementActive())
-            // response to valid request
-            .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK))
-            .setBody(constant(""));
+                // validate request
+                .validate(agreementNumber)
+                .validate(isAgreementActive())
+                // response to valid request
+                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK))
+                .setBody(constant(""))
+            .endRest()
 
             // process checkout
-        from("rest:post:checkout").id("ProcessFormCheckout")
+            .post().route().id("ProcessFormCheckout")
                 // processing bad request
                 .onException(PredicateValidationException.class).handled(true)
                 .log(LoggingLevel.WARN, "${exception.message}").setBody(constant(""))
@@ -72,10 +76,11 @@ public class FormCheckoutRoute extends RouteBuilder {
                     .log("Checkout orderNumber:${header.orderNumber} for agreement:${header.uid}, amount:${header.amount}")
                     // register orderNumber on payment service 
                     .process("sberRegisterOrder")
-                .end();
+                .end()
+            .endRest()
 
             // autopayment EXPERIMENTAL 
-            from("rest:post:autopayment").id("ProcessAutopaymentFormCheckout")
+            .post("/autopayment").route().id("ProcessAutopaymentFormCheckout")
                 // process error request
                 .onException(PredicateValidationException.class).handled(true)
                 .log(LoggingLevel.WARN, "${exception.message}").setBody(constant(""))
@@ -90,7 +95,8 @@ public class FormCheckoutRoute extends RouteBuilder {
                     // .process("sberRegisterOrder")
                     .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.ACCEPTED))
                     .setBody(constant("DONE"))
-                .end();
+                .end()
+            .endRest();
     }
 
 }
