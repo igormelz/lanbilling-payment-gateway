@@ -34,42 +34,46 @@ public class SberCallbackRoute extends RouteBuilder {
         Predicate approved = and(header("status").isEqualTo("1"), header("operation").isEqualTo("approved"));
 
         rest("/sber/callback").bindingMode(RestBindingMode.off).get().route().id("SberCallback")
-                // process invalid request
-                .onException(PredicateValidationException.class).handled(true)
-                .log(LoggingLevel.WARN, "request:[${headers}]:${exception.message}").setBody(constant(""))
-                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.BAD_REQUEST)).end()
+            // process invalid request
+            .onException(PredicateValidationException.class)
+                .handled(true)
+                .log(LoggingLevel.WARN, "request:[${headers}]:${exception.message}")
+                .setBody(constant(""))
+                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.BAD_REQUEST))
+            .end()
 
-                // validate callback request
-                .validate(request)
+            // validate callback request
+            .validate(request)
 
-                // process request
-                .choice()
-                    .when(successPayment)
+            // process operation
+            .choice()
+                .when(successPayment)
                     // process payment for orderNumber
                     .process("orderPayment")
                     .to("direct:registerSaleReceipt")                    
                     
-                    .when(successRefund)
+                .when(successRefund)
                     // process refund payment by orderNymber and mdOrder   
                     .process("refundPayment")
                     .to("direct:registerRefundReceipt")
                     
-                    .when(unsuccess)
+                .when(unsuccess)
                     // process cancel prepayment order 
                     .setHeader(Exchange.HTTP_RESPONSE_CODE, method("cancelOrder"))
 
-                    .when(approved)
+                .when(approved)
                     // NOOP: response 200 OK 
                     .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK))
                     
-                    .otherwise()
+                .otherwise()
                     // process unknown as error
                     .log(LoggingLevel.ERROR, "Receive unknown request: ${headers}")
                     .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.BAD_REQUEST))
-                .end()
+            .end()
 
-                // response empty body
-                .setBody(constant("")).endRest();
+            // response empty body
+            .setBody(constant(""))
+        .endRest();
 
     }
 

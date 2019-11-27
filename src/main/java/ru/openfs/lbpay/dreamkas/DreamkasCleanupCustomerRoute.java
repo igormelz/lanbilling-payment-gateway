@@ -13,17 +13,17 @@ public class DreamkasCleanupCustomerRoute extends RouteBuilder {
     public void configure() throws Exception {
 
         // cleanup clients on kabinet.dreamkas
-        from("timer:cleanup?period={{dreamkas.cleanup.period}}").id("DreamkasCleanupClients").autoStartup("{{dreamkas.cleanup.enable}}")
+        from("timer:cleanup?period={{dreamkas.cleanup.period}}")
+            .id("DreamkasCleanupClients").autoStartup("{{dreamkas.cleanup.enable}}")
             .setHeader("Authorization",constant("Bearer {{dreamkas.token}}"))
             .setHeader(Exchange.HTTP_PATH, constant("/api/clients"))
             .to("undertow:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             .split().jsonpath("$.[*].id")
                 .log("Cleanup clientId:${body}")
-                .setHeader("id", body())
                 .removeHeaders("Content.*")
                 .setHeader("Authorization",constant("Bearer {{dreamkas.token}}"))
                 .setHeader(Exchange.HTTP_METHOD,constant("DELETE"))
-                .setHeader(Exchange.HTTP_PATH, simple("/api/clients/${header.id}"))
+                .setHeader(Exchange.HTTP_PATH, simple("/api/clients/${body}"))
                 .setBody(constant(""))
                 .to("undertow:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             .end();
