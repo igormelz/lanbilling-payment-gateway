@@ -5,7 +5,7 @@ import org.apache.camel.LoggingLevel;
 import org.apache.camel.Predicate;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.rest.RestBindingMode;
-import org.apache.camel.processor.validation.PredicateValidationException;
+import org.apache.camel.support.processor.validation.PredicateValidationException;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 

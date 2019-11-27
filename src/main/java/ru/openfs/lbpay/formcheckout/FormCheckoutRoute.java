@@ -5,7 +5,7 @@ import org.apache.camel.LoggingLevel;
 import org.apache.camel.Predicate;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.rest.RestBindingMode;
-import org.apache.camel.processor.validation.PredicateValidationException;
+import org.apache.camel.support.processor.validation.PredicateValidationException;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
@@ -43,7 +43,8 @@ public class FormCheckoutRoute extends RouteBuilder {
             // process validation route 
             .get().enableCORS(true).route().routeId("ProcessFormValidate")
                 // processing bad request    
-                .onException(PredicateValidationException.class).handled(true)
+                .onException(PredicateValidationException.class)
+                .handled(true)
                 .log(LoggingLevel.WARN, "uid:[${header.uid}]:${exception.message}").setBody(constant(""))
                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND)).end()
                 // validate request
