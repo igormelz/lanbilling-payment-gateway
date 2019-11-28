@@ -36,7 +36,7 @@ public class DreamkasReceiptRoute extends RouteBuilder {
 			.end();
 
 		// attemp to register ERROR receipt by orderNumber
-		from("rest:get:reprocessing:/{orderNumber}").routeId("ReprocessingReceipt")
+		from("rest:post:reprocessing:/{orderNumber}").routeId("ReprocessingReceipt")
 				// lookup mdOrder on receipt db
 				.bean("audit", "getErrorReceipt")
 				// status is no success
