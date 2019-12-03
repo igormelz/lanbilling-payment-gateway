@@ -247,7 +247,7 @@ public class LbSoapService {
 	}
 
 	/**
-	 * process cancel prepayment order 
+	 * process cancel prepayment order
 	 */
 	public int processCancelPrePayment(Long orderNumber) {
 		if (connect()) {
@@ -323,7 +323,7 @@ public class LbSoapService {
 							LOG.info("Success cancel payment orderNumber:{}, agreement:{}, amount:{}, receipt:{}",
 									orderNumber, agreement.get().getNumber(), prepayment.get().getAmount(), receipt);
 						} else {
-							// !!! critical audit point 
+							// !!! critical audit point
 							LOG.error("LB refused to cancel payment orderNumber:{}, receipt:{} - {}", orderNumber,
 									receipt, response.getBody());
 						}
@@ -370,12 +370,17 @@ public class LbSoapService {
 						LbServiceResponse response = confirmPrePayment(orderNumber, prepayment.get().getAmount(),
 								receipt);
 						if (response.isSuccess()) {
-							payment = findAccount(agreement.get().getUid());
-							payment.setAmount(prepayment.get().getAmount());
-							LOG.info("Payment orderNumber:{} success for agreement:{} on amount:{}", orderNumber,
+							LOG.info("Success payment orderNumber:{} for agreement:{} on amount:{}", orderNumber,
 									agreement.get().getNumber(), prepayment.get().getAmount());
+							// get payee info
+							payment = findAccount(agreement.get().getUid());
+							if (payment != null) {
+								payment.setAmount(prepayment.get().getAmount());
+							} else {
+								LOG.error("No payment info for orderNumber:{}", orderNumber);
+							}
 						} else {
-							LOG.error("Error refund orderNummber:{} - {}", orderNumber, response.getBody());
+							LOG.error("Error payment orderNummber:{} - {}", orderNumber, response.getBody());
 						}
 					}
 				}
