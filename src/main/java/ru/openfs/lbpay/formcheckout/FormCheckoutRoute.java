@@ -39,58 +39,53 @@ public class FormCheckoutRoute extends RouteBuilder {
 
         // form payment endpoint
         from("rest:get:checkout").routeId("ProcessFormValidate")
-            // processing bad request    
-            .onException(PredicateValidationException.class)
-                .handled(true)
+                // processing bad request
+                .onException(PredicateValidationException.class).handled(true)
                 .log(LoggingLevel.WARN, "uid:[${header.uid}]:${exception.message}").setBody(constant(""))
                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND)).end()
-            // validate request
-            .validate(agreementNumber)
-            .validate(isAgreementActive())
-            // response to valid request
-            .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK))
-            .setBody(constant(""));
+                // validate request
+                .validate(agreementNumber).validate(isAgreementActive())
+                // response to valid request
+                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK)).setBody(constant(""));
 
-            // process checkout
+        // process checkout
         from("rest:post:checkout").id("ProcessFormCheckout")
                 // processing bad request
                 .onException(PredicateValidationException.class).handled(true)
                 .log(LoggingLevel.WARN, "${exception.message}").setBody(constant(""))
                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND)).end()
                 // validate request
-                .validate(agreementNumber)
-                .validate(amounToPay)
+                .validate(agreementNumber).validate(amounToPay)
                 // create orderNumber
                 .setHeader(PaymentGatewayConstants.ORDER_NUMBER, method("checkout", "getOrderNumber"))
                 .filter(header(PaymentGatewayConstants.ORDER_NUMBER).isEqualTo(0))
-                    // response on error create orderNumber
-                    .log(LoggingLevel.ERROR, "Error create orderNumber for checkout agreement:${header.uid}")
-                    .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND)).setBody(constant(""))
-                .end()
+                // response on error create orderNumber
+                .log(LoggingLevel.ERROR, "Error create orderNumber for checkout agreement:${header.uid}")
+                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND)).setBody(constant("")).end()
                 // on success process to bank payment
                 .filter(header(PaymentGatewayConstants.ORDER_NUMBER).isGreaterThan(0))
-                    .log("Checkout orderNumber:${header.orderNumber} for agreement:${header.uid}, amount:${header.amount}")
-                    // register orderNumber on payment service 
-                    .process("sberRegisterOrder")
-                .end();
+                .log("Checkout orderNumber:${header.orderNumber} for agreement:${header.uid}, amount:${header.amount}")
+                // register orderNumber on payment service
+                .process("sberRegisterOrder").end();
 
-            // autopayment EXPERIMENTAL 
-            from("rest:post:autopayment").id("ProcessAutopaymentFormCheckout")
+        // autopayment EXPERIMENTAL
+        from("rest:post:autopayment").id("ProcessAutopaymentFormCheckout")
                 // process error request
                 .onException(PredicateValidationException.class).handled(true)
                 .log(LoggingLevel.WARN, "${exception.message}").setBody(constant(""))
                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND)).end()
-                // validate request 
-                .validate(amounToPay)
-                .validate(agreementNumber)
-                // process request to create orderNumber
-                .setHeader(PaymentGatewayConstants.ORDER_NUMBER, method("checkout", "getOrderNumber"))
-                .filter(header(PaymentGatewayConstants.ORDER_NUMBER).isGreaterThan(0))
-                    .log("DONE ${header.orderNumber}")
-                    // .process("sberRegisterOrder")
-                    .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.ACCEPTED))
-                    .setBody(constant("DONE"))
-                .end();
+                // validate request
+                .validate(amounToPay).validate(agreementNumber);
+
+        // // process request to create orderNumber
+        // .setHeader(PaymentGatewayConstants.ORDER_NUMBER, method("checkout",
+        // "getOrderNumber"))
+        // .filter(header(PaymentGatewayConstants.ORDER_NUMBER).isGreaterThan(0))
+        // .log("DONE ${header.orderNumber}")
+        // // .process("sberRegisterOrder")
+        // .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.ACCEPTED))
+        // .setBody(constant("DONE"))
+        // .end();
     }
 
 }

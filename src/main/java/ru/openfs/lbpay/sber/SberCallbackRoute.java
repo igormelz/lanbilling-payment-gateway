@@ -60,7 +60,7 @@ public class SberCallbackRoute extends RouteBuilder {
                 .when(unsuccess)
                     // process cancel prepayment order 
                     .setHeader(Exchange.HTTP_RESPONSE_CODE, method("cancelOrder"))
-
+                   
                 .when(approved)
                     // NOOP: response 200 OK 
                     .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK))

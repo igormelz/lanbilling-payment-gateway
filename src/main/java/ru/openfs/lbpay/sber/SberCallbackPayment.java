@@ -6,7 +6,7 @@ import org.apache.camel.Processor;
 
 import ru.openfs.lbpay.PaymentGatewayConstants;
 import ru.openfs.lbpay.lbsoap.LbSoapService;
-import ru.openfs.lbpay.lbsoap.model.LbSoapPaymentInfo;
+import ru.openfs.lbpay.lbsoap.model.LbPaymentInfo;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,7 +31,7 @@ public class SberCallbackPayment implements Processor {
 		String mdOrder = message.getHeader("mdOrder", String.class);
 		LOG.info("Processing payment orderNumber:{}, mdOrder:{}", orderNumber, mdOrder);
 
-		LbSoapPaymentInfo payment = lbapi.processPaymentOrder(orderNumber, mdOrder);
+		LbPaymentInfo payment = lbapi.processPaymentOrder(orderNumber, mdOrder);
 		if (payment == null) {
 			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.INTERNAL_SERVER_ERROR);
 			return;
