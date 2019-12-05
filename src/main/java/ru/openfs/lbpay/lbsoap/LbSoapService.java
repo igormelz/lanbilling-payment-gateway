@@ -60,39 +60,25 @@ public class LbSoapService {
 	public LbSoapService() {
 	}
 
-	protected Login getLogin() {
+	private Login getLogin() {
 		Login login = new Login();
 		login.setLogin(name);
 		login.setPass(pwd);
 		return login;
 	}
 
-	protected Logout getLogout() {
-		return new Logout();
-	}
-
 	/**
 	 * connect to lbcore
+	 * @return session token or null if error
 	 */
 	private String connect() {
 		LOG.debug("LbSoap:connect");
 		String token = lbcore.requestBody(getLogin(), String.class);
-		// LbServiceResponse response = callService(getLogin());
-		// if (!response.isSuccess()) {
-		// LOG.error("Fail connect to lbcore");
-		// return false;
-		// }
-
-		// LoginResponse loginResponse = (LoginResponse) response.getBody();
-		// if (loginResponse.getRet().isEmpty()) {
-		// LOG.error("Connect return empty LoginResponse");
-		// return false;
-		// }
-
-		// // save manager ID for using on next service calls
-		// this.managerId = loginResponse.getRet().get(0).getManager().getPersonid();
-		LOG.debug("Got session:{}", token);
-		return token.replaceFirst("sessnum=(\\w+);.*", "$1");
+		if (token != null && !token.isEmpty()) {
+			LOG.debug("Got session:{}", token);
+			return token.replaceFirst("(sessnum=\\w+);.*", "$1");
+		}
+		return null;
 	}
 
 	/**

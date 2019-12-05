@@ -6,13 +6,11 @@ import org.apache.camel.Header;
 import ru.openfs.lbpay.PaymentGatewayConstants;
 import ru.openfs.lbpay.lbsoap.LbSoapService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component("checkout")
 @Profile("prom")
-@Configuration
 public class FormCheckoutOrder {
 
 	@Autowired

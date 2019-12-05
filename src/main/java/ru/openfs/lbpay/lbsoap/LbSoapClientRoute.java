@@ -24,7 +24,9 @@ public class LbSoapClientRoute extends RouteBuilder {
 
         from("direct:lbsoap-login").id("LbSoapLogin")
             .onException(Exception.class)
-                .handled(true).log(LoggingLevel.ERROR, "${exception.message}")
+                .handled(true).transform(xpath("//detail/text()", String.class))
+                .log(LoggingLevel.ERROR,"${body}")
+                .setBody(constant(null))
             .end()
             .marshal(lbsoap)
             .setHeader(Exchange.HTTP_METHOD).constant("POST")

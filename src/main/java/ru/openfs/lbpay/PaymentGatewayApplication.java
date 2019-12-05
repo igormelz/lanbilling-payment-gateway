@@ -1,7 +1,7 @@
 package ru.openfs.lbpay;
 
 import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.support.jsse.SSLContextClientParameters;
+import org.apache.camel.support.jsse.SSLContextParameters;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -9,14 +9,9 @@ import org.springframework.context.annotation.Bean;
 @SpringBootApplication
 public class PaymentGatewayApplication {
 
-	// @Bean
-	// CookieHandler cookieHandler() {
-	// 	return new InstanceCookieHandler();
-	// }
-
 	@Bean
-	SSLContextClientParameters sslContext() {
-		return new SSLContextClientParameters();
+	SSLContextParameters sslContext() {
+		return new SSLContextParameters();
 	}
 
 	@Bean
