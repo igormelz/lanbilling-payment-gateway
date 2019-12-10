@@ -37,7 +37,7 @@ public class SberCallbackRoute extends RouteBuilder {
             // process invalid request
             .onException(PredicateValidationException.class)
                 .handled(true)
-                .log(LoggingLevel.WARN, "request:[${headers}]:${exception.message}")
+                .log(LoggingLevel.WARN, "${exception.message}")
                 .setBody(constant(""))
                 .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.BAD_REQUEST))
             .end()
@@ -50,7 +50,7 @@ public class SberCallbackRoute extends RouteBuilder {
                 .when(successPayment)
                     // process payment for orderNumber
                     .process("orderPayment")
-                    .to("direct:registerSaleReceipt")                    
+                    .to("direct:registerSaleReceipt")
                     
                 .when(successRefund)
                     // process refund payment by orderNymber and mdOrder   
@@ -67,7 +67,7 @@ public class SberCallbackRoute extends RouteBuilder {
                     
                 .otherwise()
                     // process unknown as error
-                    .log(LoggingLevel.ERROR, "Receive unknown request: ${headers}")
+                    .log(LoggingLevel.ERROR, "Receive unknown request: ${header.CamelHttpQuery}")
                     .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.BAD_REQUEST))
             .end()
 

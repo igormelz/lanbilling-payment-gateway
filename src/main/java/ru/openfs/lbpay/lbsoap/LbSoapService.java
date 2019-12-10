@@ -332,7 +332,7 @@ public class LbSoapService {
 						}
 					}
 				} else {
-					LOG.warn("Prepayment orderNumber:{} is not processed and will cancelled");
+					LOG.warn("Prepayment orderNumber:{} is not processed and will cancelled", orderNumber);
 					cancelPrePayment(session, orderNumber);
 				}
 			}
