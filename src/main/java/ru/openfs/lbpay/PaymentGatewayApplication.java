@@ -20,8 +20,7 @@ public class PaymentGatewayApplication {
 
 			@Override
 			public void configure() throws Exception {
-				restConfiguration().component("undertow").host("localhost").port("{{port}}").contextPath("/pay")
-						.enableCORS(true);
+				restConfiguration().component("undertow").host("localhost").port("{{port}}").contextPath("/pay");
 			}
 
 		};

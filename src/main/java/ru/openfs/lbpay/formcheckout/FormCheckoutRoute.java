@@ -38,7 +38,7 @@ public class FormCheckoutRoute extends RouteBuilder {
                 // header("amount").regex("^[1-9][0-9]{1,4}$"));
 
                 // form payment endpoint
-                from("rest:get:checkout").routeId("ProcessFormValidate")
+                rest("/checkout").get().enableCORS(true).route().routeId("ProcessFormValidate")
                                 // processing bad request
                                 .onException(PredicateValidationException.class).handled(true)
                                 .log(LoggingLevel.WARN, "uid:[${header.uid}]:${exception.message}")
