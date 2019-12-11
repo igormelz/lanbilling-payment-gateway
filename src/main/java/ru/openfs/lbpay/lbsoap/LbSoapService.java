@@ -6,6 +6,8 @@ import java.util.Optional;
 
 import org.apache.camel.CamelExecutionException;
 import org.apache.camel.EndpointInject;
+import org.apache.camel.Handler;
+import org.apache.camel.Header;
 import org.apache.camel.ProducerTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +33,7 @@ import lb.api3.Logout;
 import lb.api3.SoapAgreement;
 import lb.api3.SoapFilter;
 import lb.api3.SoapPrePayment;
+import ru.openfs.lbpay.PaymentGatewayConstants;
 import ru.openfs.lbpay.lbsoap.model.LbPaymentInfo;
 import ru.openfs.lbpay.lbsoap.model.LbServiceResponse;
 import ru.openfs.lbpay.lbsoap.model.LbServiceResponseStatus;
@@ -69,6 +72,7 @@ public class LbSoapService {
 
 	/**
 	 * connect to lbcore
+	 * 
 	 * @return session token or null if error
 	 */
 	private String connect() {
@@ -140,7 +144,8 @@ public class LbSoapService {
 	/**
 	 * test agreement active or close
 	 */
-	public boolean isActiveAgreement(String number) {
+	@Handler
+	public boolean isActiveAgreement(@Header(PaymentGatewayConstants.FORM_AGREEMENT) String number) {
 		boolean active = false;
 		String session = connect();
 		if (session != null) {
@@ -161,7 +166,9 @@ public class LbSoapService {
 	 * 
 	 * @return orderNumber
 	 */
-	public long createPrePaymentOrder(String number, Double amount) {
+	@Handler
+	public long createPrePaymentOrder(@Header(PaymentGatewayConstants.FORM_AGREEMENT) String number,
+			@Header(PaymentGatewayConstants.FORM_AMOUNT) Double amount) {
 		long orderNumber = 0l;
 		String session = connect();
 		if (session != null) {
