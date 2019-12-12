@@ -6,7 +6,6 @@ import org.apache.camel.Predicate;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.support.processor.validation.PredicateValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -17,7 +16,6 @@ import ru.openfs.lbpay.lbsoap.LbSoapService;
 import static org.apache.camel.builder.PredicateBuilder.and;
 
 @Component
-@Configuration
 @Profile("prom")
 public class FormCheckoutRoute extends RouteBuilder {
 

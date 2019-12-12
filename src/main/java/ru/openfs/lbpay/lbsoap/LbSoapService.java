@@ -38,7 +38,7 @@ import ru.openfs.lbpay.lbsoap.model.LbPaymentInfo;
 import ru.openfs.lbpay.lbsoap.model.LbServiceResponse;
 import ru.openfs.lbpay.lbsoap.model.LbServiceResponseStatus;
 
-@Service
+@Service("lbsoap")
 @Configuration
 @Profile("prom")
 public class LbSoapService {

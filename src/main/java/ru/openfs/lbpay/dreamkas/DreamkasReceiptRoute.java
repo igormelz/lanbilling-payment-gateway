@@ -25,7 +25,7 @@ public class DreamkasReceiptRoute extends RouteBuilder {
 					// audit register receipt
 					.bean("audit", "registerReceipt")
 					// try re-register receipt
-					.bean("dreamkas", "register")
+					.bean("ofdReceipt", "register")
 				.end()
 				// receipt not found
 				.filter(header("mdOrder").isNull())

@@ -85,7 +85,7 @@ public class SberCallbackRoute extends RouteBuilder {
 				// audit register receipt
 				.bean("audit", "registerReceipt")
 				// register receipt
-				.bean("dreamkas", "register")
+				.bean("ofdReceipt", "register")
 			.end();
 
         // process refund payment
@@ -104,7 +104,7 @@ public class SberCallbackRoute extends RouteBuilder {
 				// audit register receipt
 				.bean("audit", "registerReceipt")
 				// register receipt
-				.bean("dreamkas", "register")
+				.bean("ofdReceipt", "register")
             .end();
 
     }
