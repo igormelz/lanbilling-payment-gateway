@@ -245,7 +245,8 @@ public class LbSoapService {
 	/**
 	 * process cancel prepayment order
 	 */
-	public int processCancelPrePayment(Long orderNumber) {
+	@Handler
+	public int processCancelPrePayment(@Header(PaymentGatewayConstants.ORDER_NUMBER) Long orderNumber) {
 		int answer = StatusCodes.INTERNAL_SERVER_ERROR;
 		String session = connect();
 		if (session != null) {
@@ -312,7 +313,9 @@ public class LbSoapService {
 	 * 
 	 * @return billingPaymentInfo or null if error
 	 */
-	public LbPaymentInfo processRefundOrder(Long orderNumber, String receipt) {
+	@Handler
+	public LbPaymentInfo processRefundOrder(@Header(PaymentGatewayConstants.ORDER_NUMBER) Long orderNumber,
+			@Header(PaymentGatewayConstants.SBER_ORDER_NUMBER) String receipt) {
 		LbPaymentInfo payment = null;
 		String session = connect();
 		if (session != null) {
@@ -363,7 +366,9 @@ public class LbSoapService {
 	/**
 	 * process payment order
 	 */
-	public LbPaymentInfo processPaymentOrder(Long orderNumber, String receipt) {
+	@Handler
+	public LbPaymentInfo processPaymentOrder(@Header(PaymentGatewayConstants.ORDER_NUMBER) Long orderNumber,
+			@Header(PaymentGatewayConstants.SBER_ORDER_NUMBER) String receipt) {
 		LbPaymentInfo payment = null;
 		String session = connect();
 		if (session != null) {

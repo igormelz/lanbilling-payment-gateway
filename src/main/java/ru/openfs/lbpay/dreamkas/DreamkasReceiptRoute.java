@@ -5,8 +5,6 @@ import org.apache.camel.builder.RouteBuilder;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import ru.openfs.lbpay.PaymentGatewayConstants;
-
 
 @Component
 @Profile("prom")
@@ -14,26 +12,6 @@ public class DreamkasReceiptRoute extends RouteBuilder {
 
 	@Override
 	public void configure() throws Exception {
-
-		// process payment fiscalization
-		from("direct:registerSaleReceipt").id("RegisterSaleReceipt")
-			.filter(header(Exchange.HTTP_RESPONSE_CODE).isEqualTo(200))
-				.setHeader(PaymentGatewayConstants.RECEIPT_TYPE,constant("SALE"))
-				// audit register receipt
-				.bean("audit", "registerReceipt")
-				// register receipt
-				.bean("dreamkas", "register")
-			.end();
-
-		// process refund fiscalization
-		from("direct:registerRefundReceipt").id("RegisterRefundReceipt")
-			.filter(header(Exchange.HTTP_RESPONSE_CODE).isEqualTo(200))
-				.setHeader(PaymentGatewayConstants.RECEIPT_TYPE,constant("REFUND"))
-				// audit register receipt
-				.bean("audit", "registerReceipt")
-				// register receipt
-				.bean("dreamkas", "register")
-			.end();
 
 		// attemp to register ERROR receipt by orderNumber
 		from("rest:post:reprocessing:/{orderNumber}").routeId("ReprocessingReceipt")
