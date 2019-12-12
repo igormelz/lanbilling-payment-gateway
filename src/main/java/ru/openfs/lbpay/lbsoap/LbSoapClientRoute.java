@@ -18,15 +18,25 @@ public class LbSoapClientRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        
+    
         SoapJaxbDataFormat lbsoap = new SoapJaxbDataFormat("lb.api3",
         new ServiceInterfaceStrategy(Api3PortType.class, true));
 
-        from("direct:lbsoap").id("LbSoapAdapter")
+        from("direct:lbsoap-login").id("LbSoapLogin")
+            .onException(Exception.class)
+                .handled(true).transform(xpath("//detail/text()", String.class))
+                .log(LoggingLevel.ERROR,"${body}")
+                .setBody(constant(null))
+            .end()
+            .marshal(lbsoap)
+            .setHeader(Exchange.HTTP_METHOD).constant("POST")
+            .to("undertow:http://{{lbcore}}?throwExceptionOnFailure=true&keepAlive=false")
+            .setBody(header("Set-Cookie"));
+
+        from("direct:lbsoap-adapter").id("LbSoapAdapter")
             .onException(SOAPFaultException.class)
                 // process soap exception
-                .handled(true)
-                .log(LoggingLevel.ERROR, "${exception.message}")
+                .handled(true).log(LoggingLevel.ERROR, "${exception.message}")
             .end()
 
             // marshalling body to soap message 
@@ -34,17 +44,15 @@ public class LbSoapClientRoute extends RouteBuilder {
             
             // post request to endpoint
             .setHeader(Exchange.HTTP_METHOD).constant("POST")
-            .to("undertow:http://{{lbcore}}?throwExceptionOnFailure=false&cookieHandler=#cookieHandler")
+            .to("undertow:http://{{lbcore}}?throwExceptionOnFailure=false&keepAlive=false")
             
-            // process response 
+            // process error response as string
             .filter(header(Exchange.HTTP_RESPONSE_CODE).isNotEqualTo(200))
-                // convert error message to string
                 .transform(xpath("//detail/text()", String.class))
-                .log(LoggingLevel.ERROR, "${body}")
             .end()
             
+            // unmarshall soap message 
             .filter(header(Exchange.HTTP_RESPONSE_CODE).isEqualTo(200))
-                // unmarshall soap message 
                 .unmarshal(lbsoap)
             .end();
     }

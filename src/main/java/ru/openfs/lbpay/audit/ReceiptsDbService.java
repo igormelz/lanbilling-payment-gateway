@@ -53,8 +53,8 @@ public class ReceiptsDbService {
     @Handler
     public void getErrorReceipt(@Header("orderNumber") Long orderNumber, Message message) {
         StringBuilder sql = new StringBuilder("select o.mdOrder, o.amount, o.phone, o.email, o.receiptType ")
-                .append("from (select * from receipts where orderNumber=").append(orderNumber)
-                .append(" order by id desc limit 1) o ").append("where o.operationStatus='ERROR'");
+                .append("from (select *,coalesce(operationStatus,'NONE') as status from receipts where orderNumber=").append(orderNumber)
+                .append(" order by id desc limit 1) o ").append("where o.status !='SUCCESS'");
         try {
             Object answer = producer.requestBody(sql.toString());
             if (answer instanceof List) {
