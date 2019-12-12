@@ -44,6 +44,8 @@ public class SberCallbackRoute extends RouteBuilder {
             .end()
             // validate request
             .validate(request)
+            // set deafult response code as error
+            .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.INTERNAL_SERVER_ERROR))
             // process request
             .choice()
                 .when(payment)
@@ -70,12 +72,6 @@ public class SberCallbackRoute extends RouteBuilder {
         from("direct:payment").id("ProcessPayment")
             .log("Processing payment orderNumber:${header.orderNumber}, mdOrder:${header.mdOrder}")
             .bean(lbapi,"processPaymentOrder")
-            .filter(body().isNull())
-                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.INTERNAL_SERVER_ERROR))
-            .end()
-            .filter(body().isNull())
-                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.INTERNAL_SERVER_ERROR))
-            .end()
             .filter(body().isNotNull())
                 .setHeader(PaymentGatewayConstants.ORDER_AMOUNT,simple("${body.amount}"))
                 .setHeader(PaymentGatewayConstants.CUSTOMER_PHONE, simple("${body.customerPhone}"))
@@ -92,9 +88,6 @@ public class SberCallbackRoute extends RouteBuilder {
         from("direct:refund").id("ProcessRefund")
             .log("Processing refund orderNumber:${header.orderNumber}, mdOrder:${header.mdOrder}")
             .bean(lbapi,"processRefundOrder")
-            .filter(body().isNull())
-                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.INTERNAL_SERVER_ERROR))
-            .end()
             .filter(body().isNotNull())
                 .setHeader(PaymentGatewayConstants.ORDER_AMOUNT,simple("${body.amount}"))
                 .setHeader(PaymentGatewayConstants.CUSTOMER_PHONE, simple("${body.customerPhone}"))
