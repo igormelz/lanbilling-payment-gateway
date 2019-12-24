@@ -33,7 +33,7 @@ public class ReceiptsDbService {
     @Handler
     public void registerReceipt(@Header(PaymentGatewayConstants.RECEIPT_TYPE) String receiptType,
             @Header("orderNumber") Long orderNumber, @Header("mdOrder") String mdOrder,
-            @Header(PaymentGatewayConstants.ORDER_AMOUNT) Long amount,
+            @Header(PaymentGatewayConstants.ORDER_AMOUNT) double amount,
             @Header(PaymentGatewayConstants.CUSTOMER_EMAIL) String email,
             @Header(PaymentGatewayConstants.CUSTOMER_PHONE) String phone) {
         StringBuilder sql = new StringBuilder("insert into receipts set receiptType='").append(receiptType).append("',")
