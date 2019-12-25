@@ -18,7 +18,8 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import io.undertow.util.StatusCodes;
+import ru.openfs.lbpay.PaymentGatewayConstants;
+
 
 @Component("sberRegisterOrder")
 @Profile("prom")
@@ -88,23 +89,23 @@ public class SberRegisterQrderService implements Processor {
 					// process error response
 					LOG.error("Sberbank response error code:{}, message:{}", sberResponse.get("errorCode"),
 							sberResponse.get("errorMessage"));
-					message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.NOT_ACCEPTABLE);
+					message.setHeader(Exchange.HTTP_RESPONSE_CODE, PaymentGatewayConstants.NOT_ACCEPTABLE);
 					return;
 				}
 				if (sberResponse.containsKey("formUrl")) {
 					// process success response
 					LOG.info("Sberbank success register orderId:{}", sberResponse.get("orderId"));
 					message.removeHeaders(".*");
-					message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.MOVED_PERMANENTLY);
+					message.setHeader(Exchange.HTTP_RESPONSE_CODE, PaymentGatewayConstants.MOVED_PERMANENTLY);
 					message.setHeader("Location", sberResponse.get("formUrl"));
 					return;
 				}
 			}
 			// otherwise return error 
-			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.NOT_ACCEPTABLE);
+			message.setHeader(Exchange.HTTP_RESPONSE_CODE, PaymentGatewayConstants.NOT_ACCEPTABLE);
 		} catch (CamelExecutionException e) {
 			LOG.error("Sber got exception:{}", e.getMessage());
-			message.setHeader(Exchange.HTTP_RESPONSE_CODE, StatusCodes.INTERNAL_SERVER_ERROR);
+			message.setHeader(Exchange.HTTP_RESPONSE_CODE, PaymentGatewayConstants.INTERNAL_SERVER_ERROR);
 			return;
 		}
 	}

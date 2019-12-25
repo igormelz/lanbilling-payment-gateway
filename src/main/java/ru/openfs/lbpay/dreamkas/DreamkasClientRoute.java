@@ -36,7 +36,7 @@ public class DreamkasClientRoute extends RouteBuilder {
             .setHeader(Exchange.HTTP_METHOD,constant("POST"))
             .setHeader("Authorization",constant("Bearer {{dreamkas.token}}"))
             // submit receipt
-            .to("undertow:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
+            .to("netty-http:{{dreamkas.url}}?ssl=true&sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             // on success response register operation  
             .unmarshal(operation)
             .log("Receipt mdOrder:${body.externalId}, operation:${body.id} [${body.status}]")

@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import io.undertow.util.StatusCodes;
 import ru.openfs.lbpay.PaymentGatewayConstants;
 import ru.openfs.lbpay.lbsoap.LbSoapService;
 
@@ -40,7 +39,7 @@ public class FormCheckoutRoute extends RouteBuilder {
                         .onException(PredicateValidationException.class).handled(true)
                                 .log(LoggingLevel.WARN, "Validation failed for uid=${header.uid}")
                                 .setBody(constant(""))
-                                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND))
+                                .setHeader(Exchange.HTTP_RESPONSE_CODE).constant(PaymentGatewayConstants.BAD_REQUEST)
                         .end()
                         
                         // validate request
@@ -48,7 +47,8 @@ public class FormCheckoutRoute extends RouteBuilder {
                         .validate(method(lbapi,"isActiveAgreement").isEqualTo(true))
                                 
                         // response to valid request
-                        .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK)).setBody(constant(""));
+                        .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.OK))
+                        .setBody(constant(""));
 
                 // process checkout
                 from("rest:post:checkout").id("ProcessFormCheckout")
@@ -56,7 +56,7 @@ public class FormCheckoutRoute extends RouteBuilder {
                         .onException(PredicateValidationException.class).handled(true)
                                 .log(LoggingLevel.WARN, "Validation failed for uid=${header.uid}, amount=${header.amount}")
                                 .setBody(constant(""))
-                                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND))
+                                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.BAD_REQUEST))
                         .end()
 
                         // validate request
@@ -68,7 +68,7 @@ public class FormCheckoutRoute extends RouteBuilder {
                                 // response on error create orderNumber
                                 .log(LoggingLevel.ERROR,
                                                 "Error create orderNumber for checkout agreement:${header.uid}")
-                                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND))
+                                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.NOT_FOUND))
                                 .setBody(constant(""))
                         .end()
                         
@@ -84,7 +84,7 @@ public class FormCheckoutRoute extends RouteBuilder {
                         // process error request
                         .onException(PredicateValidationException.class).handled(true)
                                 .log(LoggingLevel.WARN, "${exception.message}").setBody(constant(""))
-                                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.NOT_FOUND))
+                                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.NOT_FOUND))
                         .end()
                         
                         // validate request
@@ -95,7 +95,7 @@ public class FormCheckoutRoute extends RouteBuilder {
                         .filter(header(PaymentGatewayConstants.ORDER_NUMBER).isGreaterThan(0))
                                 .log("DONE ${header.orderNumber}")
                                 // .process("sberRegisterOrder")
-                                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.ACCEPTED))
+                                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.ACCEPTED))
                                 .setBody(constant("DONE"))
                         .end();
         }

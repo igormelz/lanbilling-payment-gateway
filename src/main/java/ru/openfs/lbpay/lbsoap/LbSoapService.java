@@ -16,7 +16,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
-import io.undertow.util.StatusCodes;
 import lb.api3.CancelPrePayment;
 import lb.api3.ConfirmPrePayment;
 import lb.api3.ExternCancelPayment;
@@ -247,7 +246,7 @@ public class LbSoapService {
 	 */
 	@Handler
 	public int processCancelPrePayment(@Header(PaymentGatewayConstants.ORDER_NUMBER) Long orderNumber) {
-		int answer = StatusCodes.INTERNAL_SERVER_ERROR;
+		int answer = PaymentGatewayConstants.INTERNAL_SERVER_ERROR;
 		String session = connect();
 		if (session != null) {
 			// get prepayment order
@@ -261,15 +260,15 @@ public class LbSoapService {
 								agreement.getNumber());
 					});
 					if (cancelPrePayment(session, orderNumber)) {
-						answer = StatusCodes.OK;
+						answer = PaymentGatewayConstants.OK;
 					}
 				} else {
 					LOG.warn("Prepayment orderNumber:{} already processed", orderNumber);
-					answer = StatusCodes.OK;
+					answer = PaymentGatewayConstants.OK;
 				}
 			} else {
 				LOG.error("Prepayment orderNumber:{} not found", orderNumber);
-				answer = StatusCodes.NOT_FOUND;
+				answer = PaymentGatewayConstants.NOT_FOUND;
 			}
 			disconnect(session);
 		}

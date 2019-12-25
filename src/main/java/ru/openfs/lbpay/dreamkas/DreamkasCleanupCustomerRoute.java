@@ -17,7 +17,7 @@ public class DreamkasCleanupCustomerRoute extends RouteBuilder {
             .id("DreamkasCleanupClients").autoStartup("{{dreamkas.cleanup.enable}}")
             .setHeader("Authorization",constant("Bearer {{dreamkas.token}}"))
             .setHeader(Exchange.HTTP_PATH, constant("/api/clients"))
-            .to("undertow:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
+            .to("netty-http:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             .split().jsonpath("$.[*].id")
                 .log("Cleanup clientId:${body}")
                 .removeHeaders("Content.*")
@@ -25,7 +25,7 @@ public class DreamkasCleanupCustomerRoute extends RouteBuilder {
                 .setHeader(Exchange.HTTP_METHOD,constant("DELETE"))
                 .setHeader(Exchange.HTTP_PATH, simple("/api/clients/${body}"))
                 .setBody(constant(""))
-                .to("undertow:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
+                .to("netty-http:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             .end();
     }
 

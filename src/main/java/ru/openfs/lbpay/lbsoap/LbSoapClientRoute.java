@@ -30,7 +30,7 @@ public class LbSoapClientRoute extends RouteBuilder {
             .end()
             .marshal(lbsoap)
             .setHeader(Exchange.HTTP_METHOD).constant("POST")
-            .to("undertow:http://{{lbcore}}?throwExceptionOnFailure=true&keepAlive=false")
+            .to("netty-http:http://{{lbcore}}?throwExceptionOnFailure=true&keepAlive=false")
             .setBody(header("Set-Cookie"));
 
         from("direct:lbsoap-adapter").id("LbSoapAdapter")
@@ -44,7 +44,7 @@ public class LbSoapClientRoute extends RouteBuilder {
             
             // post request to endpoint
             .setHeader(Exchange.HTTP_METHOD).constant("POST")
-            .to("undertow:http://{{lbcore}}?throwExceptionOnFailure=false&keepAlive=false")
+            .to("netty-http:http://{{lbcore}}?throwExceptionOnFailure=false&keepAlive=false")
             
             // process error response as string
             .filter(header(Exchange.HTTP_RESPONSE_CODE).isNotEqualTo(200))
