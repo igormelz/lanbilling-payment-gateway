@@ -59,14 +59,15 @@ public class SberRegisterQrderService implements Processor {
 			queryString.append("token=").append(token);
 		}
 		queryString.append("&orderNumber=").append(String.valueOf(orderNumber));
-		queryString.append("&amount=").append(String.valueOf(amount.intValue() * 100));
+		// convert amount to cents 
+		queryString.append("&amount=").append((long) (amount * 100));
 		queryString.append("&returnUrl=").append(encodeValue(returnUrl));
 		queryString.append("&failUrl=").append(encodeValue(failUrl));
 		queryString.append("&description=").append(account);
 		queryString.append("&currency=643");
 		queryString.append("&language=ru");
 		queryString.append("&pageView=DESKTOP");
-		queryString.append("&sessionTimeoutSecs=1200"); // 20 min
+		queryString.append("&sessionTimeoutSecs=600"); // 10 min
 		return queryString.toString();
 	}
 
