@@ -20,7 +20,7 @@ public class PaymentGatewayApplication {
 
 			@Override
 			public void configure() throws Exception {
-				restConfiguration().component("undertow").host("localhost").port("{{port}}").contextPath("/pay");
+				restConfiguration().component("netty-http").host("localhost").port("{{server.port}}").contextPath("/pay");
 			}
 
 		};

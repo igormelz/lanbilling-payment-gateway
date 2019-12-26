@@ -4,11 +4,9 @@ import org.apache.camel.Exchange;
 import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.model.dataformat.JsonLibrary;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("prom")
 public class SberClientRoute extends RouteBuilder {
 
     @Override
@@ -16,7 +14,7 @@ public class SberClientRoute extends RouteBuilder {
         // Sberbank Register Order
         from("direct:sberRegisterOrder").id("SberRestClient").onException(Exception.class).handled(true)
                 .log(LoggingLevel.ERROR, "${exception.message}").end()
-                .to("undertow:{{sber.Url}}?throwExceptionOnFailure=false&sslContextParameters=#sslContext")
+                .to("netty-http:{{sber.Url}}?ssl=true&throwExceptionOnFailure=false&sslContextParameters=#sslContext")
                 .filter(header(Exchange.HTTP_RESPONSE_CODE).isEqualTo(200))
                 // convert success json message to map
                 .unmarshal().json(JsonLibrary.Jackson).end()

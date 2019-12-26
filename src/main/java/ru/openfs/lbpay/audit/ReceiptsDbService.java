@@ -13,14 +13,12 @@ import org.apache.camel.Message;
 import org.apache.camel.ProducerTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import ru.openfs.lbpay.PaymentGatewayConstants;
 import ru.openfs.lbpay.dreamkas.model.Operation;
 
 @Service("audit")
-@Profile("prom")
 public class ReceiptsDbService {
     private static Logger LOG = LoggerFactory.getLogger(ReceiptsDbService.class);
 
@@ -33,7 +31,7 @@ public class ReceiptsDbService {
     @Handler
     public void registerReceipt(@Header(PaymentGatewayConstants.RECEIPT_TYPE) String receiptType,
             @Header("orderNumber") Long orderNumber, @Header("mdOrder") String mdOrder,
-            @Header(PaymentGatewayConstants.ORDER_AMOUNT) Long amount,
+            @Header(PaymentGatewayConstants.ORDER_AMOUNT) double amount,
             @Header(PaymentGatewayConstants.CUSTOMER_EMAIL) String email,
             @Header(PaymentGatewayConstants.CUSTOMER_PHONE) String phone) {
         StringBuilder sql = new StringBuilder("insert into receipts set receiptType='").append(receiptType).append("',")

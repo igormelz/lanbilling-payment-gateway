@@ -5,14 +5,12 @@ import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.jackson.JacksonDataFormat;
 import org.apache.camel.http.common.HttpOperationFailedException;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import ru.openfs.lbpay.dreamkas.model.Operation;
 import ru.openfs.lbpay.dreamkas.model.Receipt;
 
 @Component
-@Profile("prom")
 public class DreamkasClientRoute extends RouteBuilder {
 
     @Override
@@ -36,7 +34,7 @@ public class DreamkasClientRoute extends RouteBuilder {
             .setHeader(Exchange.HTTP_METHOD,constant("POST"))
             .setHeader("Authorization",constant("Bearer {{dreamkas.token}}"))
             // submit receipt
-            .to("undertow:{{dreamkas.url}}?sslContextParameters=#sslContext&throwExceptionOnFailure=true")
+            .to("netty-http:{{dreamkas.url}}?ssl={{dreamkas.useSSL}}&sslContextParameters=#sslContext&throwExceptionOnFailure=true")
             // on success response register operation  
             .unmarshal(operation)
             .log("Receipt mdOrder:${body.externalId}, operation:${body.id} [${body.status}]")

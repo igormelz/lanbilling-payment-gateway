@@ -6,17 +6,14 @@ import org.apache.camel.Predicate;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.support.processor.validation.PredicateValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import io.undertow.util.StatusCodes;
 import ru.openfs.lbpay.PaymentGatewayConstants;
 import ru.openfs.lbpay.lbsoap.LbSoapService;
 
 import static org.apache.camel.builder.PredicateBuilder.and;
 
 @Component
-@Profile("prom")
 public class SberCallbackRoute extends RouteBuilder {
 
     @Autowired
@@ -40,12 +37,12 @@ public class SberCallbackRoute extends RouteBuilder {
                 .handled(true)
                 .log(LoggingLevel.WARN, "${exception.message}")
                 .setBody(constant(""))
-                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.BAD_REQUEST))
+                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.BAD_REQUEST))
             .end()
             // validate request
             .validate(request)
             // set deafult response code as error
-            .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.INTERNAL_SERVER_ERROR))
+            .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.INTERNAL_SERVER_ERROR))
             // process request
             .choice()
                 .when(payment)
@@ -53,7 +50,7 @@ public class SberCallbackRoute extends RouteBuilder {
                 .when(and(unsuccess,header("operation").isEqualToIgnoreCase("deposited")))
                     // workaround for cancel deposited operation 
                     .log(LoggingLevel.WARN,"Do not cancel orderNumber:${header.orderNumber} by operation:deposited. Waiting to success.")
-                    .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK))
+                    .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.OK))
                 .when(unsuccess)
                     .log("Processing cancel orderNumber:${header.orderNumber} by operation:${header.operation}")
                     .setHeader(Exchange.HTTP_RESPONSE_CODE, method(lbapi,"processCancelPrePayment"))
@@ -61,11 +58,11 @@ public class SberCallbackRoute extends RouteBuilder {
                     .to("direct:refund")
                 .when(approved)
                     // NOOP: response 200 OK 
-                    .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK))
+                    .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.OK))
                 .otherwise()
                     // process unknown as error
                     .log(LoggingLevel.ERROR, "Receive unknown request: ${header.CamelHttpQuery}")
-                    .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.BAD_REQUEST))
+                    .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.BAD_REQUEST))
             .end()
             .setBody(constant(""));
         
@@ -76,7 +73,7 @@ public class SberCallbackRoute extends RouteBuilder {
                 .setHeader(PaymentGatewayConstants.ORDER_AMOUNT,simple("${body.amount}"))
                 .setHeader(PaymentGatewayConstants.CUSTOMER_PHONE, simple("${body.customerPhone}"))
                 .setHeader(PaymentGatewayConstants.CUSTOMER_EMAIL, simple("${body.customerEmail}"))
-                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK))        
+                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.OK))        
 				.setHeader(PaymentGatewayConstants.RECEIPT_TYPE,constant("SALE"))
 				// audit register receipt
 				.bean("audit", "registerReceipt")
@@ -92,7 +89,7 @@ public class SberCallbackRoute extends RouteBuilder {
                 .setHeader(PaymentGatewayConstants.ORDER_AMOUNT,simple("${body.amount}"))
                 .setHeader(PaymentGatewayConstants.CUSTOMER_PHONE, simple("${body.customerPhone}"))
 		        .setHeader(PaymentGatewayConstants.CUSTOMER_EMAIL, simple("${body.customerEmail}"))
-		        .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(StatusCodes.OK))
+		        .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(PaymentGatewayConstants.OK))
 				.setHeader(PaymentGatewayConstants.RECEIPT_TYPE,constant("REFUND"))
 				// audit register receipt
 				.bean("audit", "registerReceipt")
