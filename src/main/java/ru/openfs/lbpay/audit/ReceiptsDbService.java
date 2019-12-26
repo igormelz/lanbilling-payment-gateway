@@ -13,14 +13,12 @@ import org.apache.camel.Message;
 import org.apache.camel.ProducerTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 
 import ru.openfs.lbpay.PaymentGatewayConstants;
 import ru.openfs.lbpay.dreamkas.model.Operation;
 
 @Service("audit")
-@Profile("prom")
 public class ReceiptsDbService {
     private static Logger LOG = LoggerFactory.getLogger(ReceiptsDbService.class);
 

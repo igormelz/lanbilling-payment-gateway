@@ -7,13 +7,11 @@ import org.apache.camel.LoggingLevel;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.dataformat.soap.SoapJaxbDataFormat;
 import org.apache.camel.dataformat.soap.name.ServiceInterfaceStrategy;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import lb.api3.Api3PortType;
 
 @Component
-@Profile("prom")
 public class LbSoapClientRoute extends RouteBuilder {
 
     @Override

@@ -2,12 +2,10 @@ package ru.openfs.lbpay.dreamkas;
 
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 
 @Component
-@Profile("prom")
 public class DreamkasReceiptRoute extends RouteBuilder {
 
 	@Override

@@ -24,7 +24,7 @@ public class DreamkasMockRoute extends RouteBuilder {
 
         JacksonDataFormat answer = new JacksonDataFormat(Operation.class);
 
-        from("netty-http:http://127.0.0.1:7001/api/receipts?httpMethodRestrict=POST")
+        from("netty-http:http://localhost:7001/api/receipts?httpMethodRestrict=POST")
                 .routeId("DreamkasMockService").unmarshal().json(JsonLibrary.Jackson).log("MOCK REQ:${body}")
                 .process(new Processor() {
 
@@ -42,14 +42,14 @@ public class DreamkasMockRoute extends RouteBuilder {
 
                 }).marshal(answer).setHeader(Exchange.HTTP_RESPONSE_CODE, constant(202)).log("MOCK RES:${body}");
 
-        from("netty-http:http://127.0.0.1:7001/api/clients?httpMethodRestrict=GET")
-                .routeId("DreamkasMockServiceClients")
-                .setBody(constant("[{\"id\":\"19f78eee\", \"name\":null, \"phone\":\"+12321312\", \"email\":null}]"))
-                .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(200)).log("MOCK CLIENTS:${body}");
+        // from("netty-http:https://localhost:7001/api/clients?httpMethodRestrict=GET")
+        //         .routeId("DreamkasMockServiceClients")
+        //         .setBody(constant("[{\"id\":\"19f78eee\", \"name\":null, \"phone\":\"+12321312\", \"email\":null}]"))
+        //         .setHeader(Exchange.HTTP_RESPONSE_CODE, constant(200)).log("MOCK CLIENTS:${body}");
 
-        from("netty-http:http://127.0.0.1:7001/api/clients/19f78eee?httpMethodRestrict=DELETE")
-                .setBody(constant(null)).setHeader(Exchange.HTTP_RESPONSE_CODE, constant(204))
-                .log("MOCK CLIENTS:DELETE:OK");
+        // from("netty-http:https://localhost:7001/api/clients/19f78eee?httpMethodRestrict=DELETE")
+        //         .setBody(constant(null)).setHeader(Exchange.HTTP_RESPONSE_CODE, constant(204))
+        //         .log("MOCK CLIENTS:DELETE:OK");
     }
 
 }
