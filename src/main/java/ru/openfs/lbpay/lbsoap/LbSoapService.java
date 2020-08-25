@@ -45,6 +45,8 @@ public class LbSoapService {
 	private static final long STATUS_PROCESSED = 1;
 	private static final long STATUS_CANCELED = 2;
 
+	DateTimeFormatter payDateFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy_HH:mm:ss");
+
 	@EndpointInject(uri = "direct:lbsoap-adapter")
 	ProducerTemplate adapter;
 
@@ -95,7 +97,7 @@ public class LbSoapService {
 	}
 
 	/**
-	 * call billing to get agreement by nuber
+	 * call billing to get agreement by number
 	 */
 	private Optional<SoapAgreement> findAgreement(String session, String number) {
 		SoapFilter filter = new SoapFilter();
@@ -358,6 +360,19 @@ public class LbSoapService {
 		request.setReceipt(receipt);
 		request.setPaydate(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now()));
 		return callService(session, request);
+	}
+
+	/**
+	 * process direct (online) payment
+	 */
+	@Handler
+	public int processDirectPayment(@Header(PaymentGatewayConstants.ACCOUNT) String account,
+			@Header(PaymentGatewayConstants.AMOUNT) String amount, @Header(PaymentGatewayConstants.PAY_ID) String payId,
+			@Header(PaymentGatewayConstants.PAY_DATE) String payDate) {
+		// parse payDate 
+		LocalDateTime paymentDateTime = LocalDateTime.parse(payDate, payDateFormat);
+		LOG.info("Parsed payDate:{}", paymentDateTime);
+		return 0;
 	}
 
 	/**
