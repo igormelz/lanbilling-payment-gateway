@@ -56,7 +56,7 @@ public class SberOnlineResponse {
    private String address;
 
    @XmlElement(name = "BALANCE")
-   private String balance;
+   private Double balance;
 
    @XmlElement(name = "INFO")
    private String info;
@@ -65,7 +65,13 @@ public class SberOnlineResponse {
    private String regDate;
 
    @XmlElement(name = "AMOUNT")
-   private String amount;
+   private Double amount;
+
+   @XmlElement(name = "REC_SUM")
+   private Double recSum;
+
+   @XmlElement(name = "EXT_ID")
+   private Long extId;
 
    public SberOnlineResponse() {
    }
@@ -82,7 +88,7 @@ public class SberOnlineResponse {
       this.address = address;
    }
 
-   public void setBalance(String balance) {
+   public void setBalance(Double balance) {
       this.balance = balance;
    }
 
@@ -94,10 +100,18 @@ public class SberOnlineResponse {
       this.regDate = regDate;
    }
 
-   public void setAmount(String amount) {
+   public void setAmount(Double amount) {
       this.amount = amount;
    }
 
+   public void setRecSum(Double recSum) {
+      this.recSum = recSum;
+   }
+
+   public void setExtId(Long extId) {
+      this.extId = extId;
+   }
+   
    // base response
    public SberOnlineResponse(CodeResponse codeResponse) {
       this.code = codeResponse.getCode();

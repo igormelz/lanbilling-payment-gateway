@@ -32,41 +32,57 @@ public class SberOnlineRoute extends RouteBuilder {
                 header(PaymentGatewayConstants.ACTION).in(PaymentGatewayConstants.ACTION_CHECK,
                         PaymentGatewayConstants.ACTION_PAY));
         Predicate validAccount = and(header(PaymentGatewayConstants.ACCOUNT).isNotNull(),
-                header(PaymentGatewayConstants.ACCOUNT).regex("\\d{6}$"));
+                header(PaymentGatewayConstants.ACCOUNT).regex("\\d{6,7}$"));
         Predicate validAmount = and(header(PaymentGatewayConstants.AMOUNT).isNotNull(),
                 header(PaymentGatewayConstants.AMOUNT).regex("\\d+\\.\\d{0,2}$"));
         Predicate validPayId = and(header(PaymentGatewayConstants.PAY_ID).isNotNull(),
                 header(PaymentGatewayConstants.PAY_ID).regex("\\d+$"));
         Predicate validPayDate = and(header(PaymentGatewayConstants.PAY_DATE).isNotNull(),
                 header(PaymentGatewayConstants.PAY_DATE)
-                        .regex("(\\d{2}).(\\d{2}).(\\d{4})_(\\d{2}):(\\d{2}):(\\d{2})$"));
+                    .regex("(\\d{2}).(\\d{2}).(\\d{4})_(\\d{2}):(\\d{2}):(\\d{2})$"));
 
         rest("/sber/online").bindingMode(RestBindingMode.xml).consumes("application/xml").produces("application/xml")
-                .get().id("SberOnline").outType(SberOnlineResponse.class).route().routeId("ProcessSberOnline")
+            .get().id("SberOnline").outType(SberOnlineResponse.class)
+            .route().routeId("ProcessSberOnline")
                 .onException(PredicateValidationException.class).handled(true)
-                .log(LoggingLevel.WARN, "Wrong required parameters").setBody(method(response, "unknownRequest")).end()
-                .log("Process request: ${headers.CamelHttpQuery}").validate(validAction).validate(validAccount).choice()
-                .when(header(PaymentGatewayConstants.ACTION).isEqualToIgnoreCase(PaymentGatewayConstants.ACTION_CHECK))
-                //
-                // process check account
-                //
-                .setHeader("uid", header(PaymentGatewayConstants.ACCOUNT)).log("Process check uid:${header.uid}")
-                .choice().when(method(lbapi, "isActiveAgreement")).log("Response check uid:${header.uid} - OK")
-                .setBody(method(response, "success")).otherwise()
-                .log(LoggingLevel.WARN, "Response check uid:${header.uid} - NOT FOUND")
-                .setBody(method(response, "accountNotFound")).endChoice().otherwise()
-                //
-                // process payment
-                //
-                .validate(validAmount).validate(validPayId).validate(validPayDate)
-                .setHeader("uid", header(PaymentGatewayConstants.ACCOUNT))
-                .log("Process payment uid:${header.uid} amount:${header.AMOUNT}").choice()
-                .when(method(lbapi, "isActiveAgreement")).log("Response check uid:${header.uid} - OK")
-                .setHeader("paymentResponse", method(lbapi,"processDirectPayment"))
-                .setBody(method(response, "success")).otherwise()
-                .log(LoggingLevel.WARN, "Response payment uid:${header.uid} - NOT FOUND")
-                .setBody(method(response, "accountNotFound")).endChoice().end();
-
+                    .log(LoggingLevel.ERROR, "Wrong required parameters")
+                    .setBody(method(response, "unknownRequest"))
+                .end()
+                .log("Process request: ${headers.CamelHttpQuery}")
+                .validate(validAction).validate(validAccount)
+                .choice()
+                    .when(header(PaymentGatewayConstants.ACTION).isEqualToIgnoreCase(PaymentGatewayConstants.ACTION_CHECK))
+                        //
+                        // process check account
+                        //
+                        // .setHeader("uid", header(PaymentGatewayConstants.ACCOUNT))
+                        .log("Process check agreement:${header.ACCOUNT}")
+                        .bean(lbapi,"processCheckPayment")
+                        // .choice()
+                        //     .when(method(lbapi, "isActiveAgreement"))
+                        //         .log("Response check agreement:${header.uid} - OK")
+                        //         .setBody(method(response, "success"))
+                        //     .otherwise()
+                        //         .log(LoggingLevel.ERROR, "Response check agreement:${header.uid} - NOT FOUND")
+                        //         .setBody(method(response, "accountNotFound"))
+                        // .endChoice()
+                    .otherwise()
+                        //
+                        // process payment
+                        //
+                        .validate(validAmount).validate(validPayId).validate(validPayDate)
+                        .setHeader("uid", header(PaymentGatewayConstants.ACCOUNT))
+                        .log("Process payment:${header.PAY_ID} agreement:${header.uid} amount:${header.AMOUNT}")
+                        .choice()
+                            .when(method(lbapi, "isActiveAgreement"))
+                                .setBody(method(lbapi,"processDirectPayment"))
+                            .otherwise()
+                                .log(LoggingLevel.ERROR, "Response payment:${header.PAY_ID} agreement:${header.uid} - NOT FOUND")
+                                .setBody(method(response, "accountNotFound"))
+                        .endChoice()
+                    .end()
+                    // remove work headers
+                    .removeHeaders("(ACTION|ACCOUNT|uid|PAY_ID|PAY_DATE|AMOUNT)");
     }
 
 }

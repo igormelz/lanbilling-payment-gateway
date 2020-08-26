@@ -1,5 +1,6 @@
 package ru.openfs.lbpay.lbsoap;
 
+import java.time.DateTimeException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Optional;
@@ -18,23 +19,35 @@ import org.springframework.stereotype.Service;
 import lb.api3.CancelPrePayment;
 import lb.api3.ConfirmPrePayment;
 import lb.api3.ExternCancelPayment;
+import lb.api3.ExternCheckPayment;
+import lb.api3.ExternCheckPaymentResponse;
+import lb.api3.ExternPayment;
+import lb.api3.ExternPaymentResponse;
 import lb.api3.GetAccount;
 import lb.api3.GetAccountResponse;
 import lb.api3.GetAgreements;
 import lb.api3.GetAgreementsResponse;
+import lb.api3.GetExternAccount;
+import lb.api3.GetExternAccountResponse;
 import lb.api3.GetPrePayments;
 import lb.api3.GetPrePaymentsResponse;
+import lb.api3.GetRecommendedPayment;
+import lb.api3.GetRecommendedPaymentResponse;
 import lb.api3.InsPrePayment;
 import lb.api3.InsPrePaymentResponse;
 import lb.api3.Login;
 import lb.api3.Logout;
 import lb.api3.SoapAgreement;
 import lb.api3.SoapFilter;
+import lb.api3.SoapPayment;
+import lb.api3.SoapPaymentFull;
 import lb.api3.SoapPrePayment;
 import ru.openfs.lbpay.PaymentGatewayConstants;
+import ru.openfs.lbpay.lbsoap.model.LbCodeExternType;
 import ru.openfs.lbpay.lbsoap.model.LbPaymentInfo;
 import ru.openfs.lbpay.lbsoap.model.LbServiceResponse;
 import ru.openfs.lbpay.lbsoap.model.LbServiceResponseStatus;
+import ru.openfs.lbpay.sberonline.SberOnlineResponse;
 
 @Service("lbsoap")
 @Configuration
@@ -46,6 +59,7 @@ public class LbSoapService {
 	private static final long STATUS_CANCELED = 2;
 
 	DateTimeFormatter payDateFormat = DateTimeFormatter.ofPattern("dd.MM.yyyy_HH:mm:ss");
+	DateTimeFormatter paymentDateFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
 	@EndpointInject(uri = "direct:lbsoap-adapter")
 	ProducerTemplate adapter;
@@ -58,6 +72,9 @@ public class LbSoapService {
 
 	@Value("${lbcore.password}")
 	private String pwd;
+
+	@Value("${lbcore.managerId:10}")
+	private Long managerId;
 
 	public LbSoapService() {
 	}
@@ -351,7 +368,13 @@ public class LbSoapService {
 	}
 
 	/**
-	 * call billing to commit payment
+	 * commit pre payment
+	 * 
+	 * @param session
+	 * @param prepayid
+	 * @param amount
+	 * @param receipt
+	 * @return
 	 */
 	private LbServiceResponse confirmPrePayment(String session, Long prepayid, Double amount, String receipt) {
 		ConfirmPrePayment request = new ConfirmPrePayment();
@@ -363,20 +386,163 @@ public class LbSoapService {
 	}
 
 	/**
-	 * process direct (online) payment
+	 * find payment
+	 * 
+	 * @param session
+	 * @param paymentId
+	 * @return paymentinfo
+	 */
+	private Optional<SoapPaymentFull> findPayment(String session, String paymentId) {
+		ExternCheckPayment request = new ExternCheckPayment();
+		request.setReceipt(paymentId);
+		LbServiceResponse response = callService(session, request);
+		if (response.isSuccess()) {
+			ExternCheckPaymentResponse payment = (ExternCheckPaymentResponse) response.getBody();
+			return Optional.of(payment.getRet().get(0));
+		}
+		return Optional.empty();
+	}
+
+	/**
+	 * process online payment
+	 * 
+	 * @param account
+	 * @param amount
+	 * @param payId
+	 * @param payDate
+	 * @return paymentResult
 	 */
 	@Handler
-	public int processDirectPayment(@Header(PaymentGatewayConstants.ACCOUNT) String account,
-			@Header(PaymentGatewayConstants.AMOUNT) String amount, @Header(PaymentGatewayConstants.PAY_ID) String payId,
+	public SberOnlineResponse processDirectPayment(@Header(PaymentGatewayConstants.ACCOUNT) String account,
+			@Header(PaymentGatewayConstants.AMOUNT) Double amount, @Header(PaymentGatewayConstants.PAY_ID) String payId,
 			@Header(PaymentGatewayConstants.PAY_DATE) String payDate) {
-		// parse payDate 
-		LocalDateTime paymentDateTime = LocalDateTime.parse(payDate, payDateFormat);
-		LOG.info("Parsed payDate:{}", paymentDateTime);
-		return 0;
+
+		// parse payDate
+		String paymentDateTime;
+		try {
+			paymentDateTime = LocalDateTime.parse(payDate, payDateFormat).format(paymentDateFormat);
+		} catch (DateTimeException ex) {
+			LOG.error("Error payment:{} - paydate:{} not parsed:{}", payId, payDate, ex.getMessage());
+			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.WRONG_FORMAT_DATE);
+		}
+
+		// validate amount
+		if (amount <= 0) {
+			LOG.error("Error payment:{} - amount:{} too small", payId, amount);
+			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.PAY_AMOUNT_TOO_SMALL);
+		}
+
+		// call backend
+		SberOnlineResponse processResponse = null;
+		String session = connect();
+		if (session != null) {
+			// fill payment data
+			SoapPayment paymentData = new SoapPayment();
+			paymentData.setPaydate(paymentDateTime);
+			paymentData.setAmount(amount);
+			paymentData.setComment("SberOnline");
+			paymentData.setModperson(0L);
+			paymentData.setCurrid(0L);
+			paymentData.setReceipt(payId);
+			paymentData.setClassid(0L);
+			// fill payment request
+			ExternPayment request = new ExternPayment();
+			request.setVal(paymentData);
+			request.setId(LbCodeExternType.AGRM_NUM.getCode());
+			request.setStr(account);
+			request.setNotexists(1L);
+			request.setOperid(0L);
+			LbServiceResponse response = callService(session, request);
+			if (response.isSuccess()) {
+				LOG.info("Success payment:{} agreement:{} amount:{}", payId, account, amount);
+				processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
+				// get transaction id
+				ExternPaymentResponse ret = (ExternPaymentResponse) response.getBody();
+				processResponse.setExtId(ret.getRet());
+				// get transaction date
+				Optional<SoapPaymentFull> payment = findPayment(session, payId);
+				if (payment.isPresent()) {
+					processResponse.setRegDate(LocalDateTime
+							.parse(payment.get().getPay().getLocaldate(), paymentDateFormat).format(payDateFormat));
+				}
+				processResponse.setAmount(amount);
+			} else if (response.isFault()) {
+				String fault = (String) response.getBody();
+				LOG.error("Error payment:{} - {}", payId, fault);
+				// check if was duplicate payment
+				if (fault.contains("already exists")) {
+					Optional<SoapPaymentFull> payment = findPayment(session, payId);
+					if (payment.isPresent()) {
+						LOG.warn("Payment:{} has already done", payId);
+						processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.PAY_TRX_DUPLICATE);
+						processResponse
+								.setExtId(Long.parseLong(fault.replaceFirst(".*\\(record_id = (\\d+)\\)$", "$1")));
+						processResponse.setAmount(payment.get().getAmountcurr());
+						processResponse.setRegDate(LocalDateTime
+								.parse(payment.get().getPay().getLocaldate(), paymentDateFormat).format(payDateFormat));
+					}
+				}
+			}
+			disconnect(session);
+		}
+		return processResponse == null ? new SberOnlineResponse(SberOnlineResponse.CodeResponse.TMP_ERR)
+				: processResponse;
+	}
+
+	private Optional<Double> getRecPayment(String session, long argmid) {
+		GetRecommendedPayment request = new GetRecommendedPayment();
+		request.setId(argmid);
+		LbServiceResponse response = callService(session, request);
+		if (response.isSuccess()) {
+			GetRecommendedPaymentResponse answer = (GetRecommendedPaymentResponse) response.getBody();
+			return Optional.of(answer.getRet());
+		}
+		return Optional.empty();
+	}
+
+	/**
+	 * process check exists agreement 
+	 * @param account
+	 * @return
+	 */
+	@Handler
+	public SberOnlineResponse processCheckPayment(@Header(PaymentGatewayConstants.ACCOUNT) String account) {
+		SberOnlineResponse processResponse = null;
+		String session = connect();
+		if (session != null) {
+
+			GetExternAccount request = new GetExternAccount();
+			request.setId(LbCodeExternType.AGRM_NUM.getCode());
+			request.setStr(account);
+
+			LbServiceResponse response = callService(session, request);
+			if (response.isSuccess()) {
+				processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
+				GetExternAccountResponse accountInfo = (GetExternAccountResponse) response.getBody();
+				if (!accountInfo.getRet().isEmpty() && accountInfo.getRet().get(0).getAgreements().get(0).getClosedon().isEmpty()) {
+					processResponse.setAddress(accountInfo.getRet().get(0).getAddresses().get(0).getAddress());
+					processResponse.setBalance(accountInfo.getRet().get(0).getAgreements().get(0).getBalance());
+					long argmid = accountInfo.getRet().get(0).getAgreements().get(0).getAgrmid();
+					Optional<Double> recPayment = getRecPayment(session, argmid);
+					if (recPayment.isPresent()) {
+						processResponse.setRecSum(recPayment.get());
+					}
+				} 
+			} else {
+				LOG.error("Error check agreement:{} - {}", account, response.getBody());
+			}
+			disconnect(session);
+		}
+		return processResponse == null ? new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_NOT_FOUND)
+				: processResponse;
 	}
 
 	/**
 	 * process payment order
+	 * 
+	 * @param orderNumber
+	 * @param receipt
+	 * @return paymentInfo
 	 */
 	@Handler
 	public LbPaymentInfo processPaymentOrder(@Header(PaymentGatewayConstants.ORDER_NUMBER) Long orderNumber,

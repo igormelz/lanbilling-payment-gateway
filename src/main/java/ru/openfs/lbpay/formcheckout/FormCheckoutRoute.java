@@ -24,7 +24,7 @@ public class FormCheckoutRoute extends RouteBuilder {
 
                 // agreement number must be 6 digits
                 Predicate agreementNumber = and(header(PaymentGatewayConstants.FORM_AGREEMENT).isNotNull(),
-                                header(PaymentGatewayConstants.FORM_AGREEMENT).regex("\\d{6}$"));
+                                header(PaymentGatewayConstants.FORM_AGREEMENT).regex("\\d{7}$"));
                 // amount to pay must be >= 10 and < 20000
                 Predicate amounToPay = and(header(PaymentGatewayConstants.FORM_AMOUNT).isNotNull(),
                                 and(header(PaymentGatewayConstants.FORM_AMOUNT).regex("\\d{2,5}$"), and(
