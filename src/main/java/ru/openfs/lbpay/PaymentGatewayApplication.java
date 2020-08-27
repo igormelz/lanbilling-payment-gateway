@@ -1,9 +1,7 @@
 package ru.openfs.lbpay;
 
 import org.apache.camel.builder.RouteBuilder;
-import org.apache.camel.http.common.cookie.CookieHandler;
-import org.apache.camel.http.common.cookie.InstanceCookieHandler;
-import org.apache.camel.support.jsse.SSLContextClientParameters;
+import org.apache.camel.support.jsse.SSLContextParameters;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -12,13 +10,8 @@ import org.springframework.context.annotation.Bean;
 public class PaymentGatewayApplication {
 
 	@Bean
-	CookieHandler cookieHandler() {
-		return new InstanceCookieHandler();
-	}
-
-	@Bean
-	SSLContextClientParameters sslContext() {
-		return new SSLContextClientParameters();
+	SSLContextParameters sslContext() {
+		return new SSLContextParameters();
 	}
 
 	@Bean
@@ -27,7 +20,7 @@ public class PaymentGatewayApplication {
 
 			@Override
 			public void configure() throws Exception {
-				restConfiguration().component("undertow").host("localhost").port("{{port}}").contextPath("/pay");
+				restConfiguration().component("netty-http").host("localhost").port("{{server.port}}").contextPath("/pay");
 			}
 
 		};
