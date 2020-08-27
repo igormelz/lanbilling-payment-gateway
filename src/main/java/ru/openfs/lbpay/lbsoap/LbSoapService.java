@@ -478,10 +478,10 @@ public class LbSoapService {
 						LOG.error("Error payment:{} - has already done", payId);
 						processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.PAY_TRX_DUPLICATE);
 						processResponse
-						.setExtId(Long.parseLong(fault.replaceFirst(".*\\(record_id = (\\d+)\\)$", "$1")));
+								.setExtId(Long.parseLong(fault.replaceFirst(".*\\(record_id = (\\d+)\\)$", "$1")));
 						processResponse.setAmount(payment.get().getAmountcurr());
 						processResponse.setRegDate(LocalDateTime
-						.parse(payment.get().getPay().getLocaldate(), paymentDateFormat).format(payDateFormat));
+								.parse(payment.get().getPay().getLocaldate(), paymentDateFormat).format(payDateFormat));
 					}
 				} else if (fault.contains("not found")) {
 					LOG.error("Error payment:{} - unknow agreement:{}", payId, account);
@@ -536,7 +536,9 @@ public class LbSoapService {
 				if (!accountInfo.getRet().isEmpty()
 						&& accountInfo.getRet().get(0).getAgreements().get(0).getClosedon().isEmpty()) {
 					processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
-					processResponse.setAddress(accountInfo.getRet().get(0).getAddresses().get(0).getAddress());
+					if (!accountInfo.getRet().get(0).getAddresses().isEmpty()) {
+						processResponse.setAddress(accountInfo.getRet().get(0).getAddresses().get(0).getAddress());
+					}
 					processResponse.setBalance(accountInfo.getRet().get(0).getAgreements().get(0).getBalance());
 					long argmid = accountInfo.getRet().get(0).getAgreements().get(0).getAgrmid();
 					Optional<Double> recPayment = getRecPayment(session, argmid);
