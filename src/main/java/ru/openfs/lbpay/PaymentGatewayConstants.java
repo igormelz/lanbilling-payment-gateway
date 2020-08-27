@@ -11,6 +11,15 @@ public class PaymentGatewayConstants {
 	public static final String FORM_AGREEMENT = "uid";
 	public static final String FORM_AMOUNT = "amount";
 
+	// sber online params 
+	public static final String ACTION = "ACTION";
+    public static final String ACCOUNT = "ACCOUNT";
+    public static final String AMOUNT = "AMOUNT";
+    public static final String PAY_ID = "PAY_ID";
+    public static final String PAY_DATE = "PAY_DATE";
+    public static final String ACTION_CHECK = "check";
+    public static final String ACTION_PAY = "payment";
+
 	// lb-pay http response codes
 	// success 
 	public static final int OK = 200;
