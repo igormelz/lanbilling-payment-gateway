@@ -73,9 +73,6 @@ public class LbSoapService {
 	@Value("${lbcore.password}")
 	private String pwd;
 
-	@Value("${lbcore.managerId:10}")
-	private Long managerId;
-
 	public LbSoapService() {
 	}
 
@@ -417,6 +414,12 @@ public class LbSoapService {
 			@Header(PaymentGatewayConstants.AMOUNT) Double amount, @Header(PaymentGatewayConstants.PAY_ID) String payId,
 			@Header(PaymentGatewayConstants.PAY_DATE) String payDate) {
 
+		// validate account format
+		if (!account.matches("\\d+$")) {
+			LOG.error("Error payment:{} - agreement:{} has bad format", payId, account);
+			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_WRONG_FORMAT);
+		}
+
 		// parse payDate
 		String paymentDateTime;
 		try {
@@ -468,19 +471,23 @@ public class LbSoapService {
 				processResponse.setAmount(amount);
 			} else if (response.isFault()) {
 				String fault = (String) response.getBody();
-				LOG.error("Error payment:{} - {}", payId, fault);
 				// check if was duplicate payment
 				if (fault.contains("already exists")) {
 					Optional<SoapPaymentFull> payment = findPayment(session, payId);
 					if (payment.isPresent()) {
-						LOG.warn("Payment:{} has already done", payId);
+						LOG.error("Error payment:{} - has already done", payId);
 						processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.PAY_TRX_DUPLICATE);
 						processResponse
-								.setExtId(Long.parseLong(fault.replaceFirst(".*\\(record_id = (\\d+)\\)$", "$1")));
+						.setExtId(Long.parseLong(fault.replaceFirst(".*\\(record_id = (\\d+)\\)$", "$1")));
 						processResponse.setAmount(payment.get().getAmountcurr());
 						processResponse.setRegDate(LocalDateTime
-								.parse(payment.get().getPay().getLocaldate(), paymentDateFormat).format(payDateFormat));
+						.parse(payment.get().getPay().getLocaldate(), paymentDateFormat).format(payDateFormat));
 					}
+				} else if (fault.contains("not found")) {
+					LOG.error("Error payment:{} - unknow agreement:{}", payId, account);
+					processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_NOT_FOUND);
+				} else {
+					LOG.error("Error payment:{} - {}", payId, fault);
 				}
 			}
 			disconnect(session);
@@ -501,12 +508,20 @@ public class LbSoapService {
 	}
 
 	/**
-	 * process check exists agreement 
+	 * process check exists agreement
+	 * 
 	 * @param account
 	 * @return
 	 */
 	@Handler
 	public SberOnlineResponse processCheckPayment(@Header(PaymentGatewayConstants.ACCOUNT) String account) {
+
+		// validate account format
+		if (!account.matches("\\d+$")) {
+			LOG.error("Agreement:{} has bad format", account);
+			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_WRONG_FORMAT);
+		}
+
 		SberOnlineResponse processResponse = null;
 		String session = connect();
 		if (session != null) {
@@ -517,9 +532,10 @@ public class LbSoapService {
 
 			LbServiceResponse response = callService(session, request);
 			if (response.isSuccess()) {
-				processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
 				GetExternAccountResponse accountInfo = (GetExternAccountResponse) response.getBody();
-				if (!accountInfo.getRet().isEmpty() && accountInfo.getRet().get(0).getAgreements().get(0).getClosedon().isEmpty()) {
+				if (!accountInfo.getRet().isEmpty()
+						&& accountInfo.getRet().get(0).getAgreements().get(0).getClosedon().isEmpty()) {
+					processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
 					processResponse.setAddress(accountInfo.getRet().get(0).getAddresses().get(0).getAddress());
 					processResponse.setBalance(accountInfo.getRet().get(0).getAgreements().get(0).getBalance());
 					long argmid = accountInfo.getRet().get(0).getAgreements().get(0).getAgrmid();
@@ -527,7 +543,10 @@ public class LbSoapService {
 					if (recPayment.isPresent()) {
 						processResponse.setRecSum(recPayment.get());
 					}
-				} 
+				} else if (!accountInfo.getRet().isEmpty()
+						&& !accountInfo.getRet().get(0).getAgreements().get(0).getClosedon().isEmpty()) {
+					processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_INACTIVE);
+				}
 			} else {
 				LOG.error("Error check agreement:{} - {}", account, response.getBody());
 			}

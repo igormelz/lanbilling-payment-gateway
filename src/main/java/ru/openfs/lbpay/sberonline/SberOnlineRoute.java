@@ -23,16 +23,11 @@ public class SberOnlineRoute extends RouteBuilder {
     @Override
     public void configure() throws Exception {
 
-        // restConfiguration().component("servlet").contextPath("/pay").dataFormatProperty(
-        // "com.fasterxml.jackson.databind.SerializationFeature.disableFeatures",
-        // "WRITE_NULL_MAP_VALUES");
-
         SberOnlineResponseFactory response = new SberOnlineResponseFactory();
         Predicate validAction = and(header(PaymentGatewayConstants.ACTION).isNotNull(),
                 header(PaymentGatewayConstants.ACTION).in(PaymentGatewayConstants.ACTION_CHECK,
                         PaymentGatewayConstants.ACTION_PAY));
-        Predicate validAccount = and(header(PaymentGatewayConstants.ACCOUNT).isNotNull(),
-                header(PaymentGatewayConstants.ACCOUNT).regex("\\d{6,7}$"));
+        Predicate validAccount = header(PaymentGatewayConstants.ACCOUNT).isNotNull();
         Predicate validAmount = and(header(PaymentGatewayConstants.AMOUNT).isNotNull(),
                 header(PaymentGatewayConstants.AMOUNT).regex("\\d+\\.\\d{0,2}$"));
         Predicate validPayId = and(header(PaymentGatewayConstants.PAY_ID).isNotNull(),
@@ -45,44 +40,24 @@ public class SberOnlineRoute extends RouteBuilder {
             .get().id("SberOnline").outType(SberOnlineResponse.class)
             .route().routeId("ProcessSberOnline")
                 .onException(PredicateValidationException.class).handled(true)
-                    .log(LoggingLevel.ERROR, "Wrong required parameters")
+                    .log(LoggingLevel.ERROR, "Wrong parameters")
                     .setBody(method(response, "unknownRequest"))
                 .end()
                 .log("Process request: ${headers.CamelHttpQuery}")
                 .validate(validAction).validate(validAccount)
                 .choice()
                     .when(header(PaymentGatewayConstants.ACTION).isEqualToIgnoreCase(PaymentGatewayConstants.ACTION_CHECK))
-                        //
                         // process check account
-                        //
-                        // .setHeader("uid", header(PaymentGatewayConstants.ACCOUNT))
                         .log("Process check agreement:${header.ACCOUNT}")
                         .bean(lbapi,"processCheckPayment")
-                        // .choice()
-                        //     .when(method(lbapi, "isActiveAgreement"))
-                        //         .log("Response check agreement:${header.uid} - OK")
-                        //         .setBody(method(response, "success"))
-                        //     .otherwise()
-                        //         .log(LoggingLevel.ERROR, "Response check agreement:${header.uid} - NOT FOUND")
-                        //         .setBody(method(response, "accountNotFound"))
-                        // .endChoice()
                     .otherwise()
-                        //
                         // process payment
-                        //
                         .validate(validAmount).validate(validPayId).validate(validPayDate)
-                        .setHeader("uid", header(PaymentGatewayConstants.ACCOUNT))
-                        .log("Process payment:${header.PAY_ID} agreement:${header.uid} amount:${header.AMOUNT}")
-                        .choice()
-                            .when(method(lbapi, "isActiveAgreement"))
-                                .setBody(method(lbapi,"processDirectPayment"))
-                            .otherwise()
-                                .log(LoggingLevel.ERROR, "Response payment:${header.PAY_ID} agreement:${header.uid} - NOT FOUND")
-                                .setBody(method(response, "accountNotFound"))
-                        .endChoice()
+                        .log("Process payment:${header.PAY_ID} agreement:${header.ACCOUNT} amount:${header.AMOUNT}")
+                        .bean(lbapi,"processDirectPayment")
                     .end()
                     // remove work headers
-                    .removeHeaders("(ACTION|ACCOUNT|uid|PAY_ID|PAY_DATE|AMOUNT)");
+                    .removeHeaders("(ACTION|ACCOUNT|PAY_ID|PAY_DATE|AMOUNT)");
     }
 
 }
