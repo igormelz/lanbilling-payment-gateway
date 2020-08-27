@@ -395,7 +395,9 @@ public class LbSoapService {
 		LbServiceResponse response = callService(session, request);
 		if (response.isSuccess()) {
 			ExternCheckPaymentResponse payment = (ExternCheckPaymentResponse) response.getBody();
-			return Optional.of(payment.getRet().get(0));
+			if (!payment.getRet().isEmpty()) {
+				return Optional.of(payment.getRet().get(0));
+			}
 		}
 		return Optional.empty();
 	}
@@ -439,56 +441,63 @@ public class LbSoapService {
 		SberOnlineResponse processResponse = null;
 		String session = connect();
 		if (session != null) {
-			// fill payment data
-			SoapPayment paymentData = new SoapPayment();
-			paymentData.setPaydate(paymentDateTime);
-			paymentData.setAmount(amount);
-			paymentData.setComment("SberOnline");
-			paymentData.setModperson(0L);
-			paymentData.setCurrid(0L);
-			paymentData.setReceipt(payId);
-			paymentData.setClassid(0L);
-			// fill payment request
-			ExternPayment request = new ExternPayment();
-			request.setVal(paymentData);
-			request.setId(LbCodeExternType.AGRM_NUM.getCode());
-			request.setStr(account);
-			request.setNotexists(1L);
-			request.setOperid(0L);
-			LbServiceResponse response = callService(session, request);
-			if (response.isSuccess()) {
-				LOG.info("Success payment:{} agreement:{} amount:{}", payId, account, amount);
-				processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
-				// get transaction id
-				ExternPaymentResponse ret = (ExternPaymentResponse) response.getBody();
-				processResponse.setExtId(ret.getRet());
-				// get transaction date
-				Optional<SoapPaymentFull> payment = findPayment(session, payId);
-				if (payment.isPresent()) {
-					processResponse.setRegDate(LocalDateTime
-							.parse(payment.get().getPay().getLocaldate(), paymentDateFormat).format(payDateFormat));
-				}
-				processResponse.setAmount(amount);
-			} else if (response.isFault()) {
-				String fault = (String) response.getBody();
-				// check if was duplicate payment
-				if (fault.contains("already exists")) {
+			// if account is active
+			if (isActiveAgreement(account)) {
+				// fill payment data
+				SoapPayment paymentData = new SoapPayment();
+				paymentData.setPaydate(paymentDateTime);
+				paymentData.setAmount(amount);
+				paymentData.setComment("SberOnline");
+				paymentData.setModperson(0L);
+				paymentData.setCurrid(0L);
+				paymentData.setReceipt(payId);
+				paymentData.setClassid(0L);
+				// fill payment request
+				ExternPayment request = new ExternPayment();
+				request.setVal(paymentData);
+				request.setId(LbCodeExternType.AGRM_NUM.getCode());
+				request.setStr(account);
+				request.setNotexists(1L);
+				request.setOperid(0L);
+				LbServiceResponse response = callService(session, request);
+				if (response.isSuccess()) {
+					LOG.info("Success payment:{} agreement:{} amount:{}", payId, account, amount);
+					processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
+					// get transaction id
+					ExternPaymentResponse ret = (ExternPaymentResponse) response.getBody();
+					processResponse.setExtId(ret.getRet());
+					// get transaction date
 					Optional<SoapPaymentFull> payment = findPayment(session, payId);
 					if (payment.isPresent()) {
-						LOG.error("Error payment:{} - has already done", payId);
-						processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.PAY_TRX_DUPLICATE);
-						processResponse
-								.setExtId(Long.parseLong(fault.replaceFirst(".*\\(record_id = (\\d+)\\)$", "$1")));
-						processResponse.setAmount(payment.get().getAmountcurr());
 						processResponse.setRegDate(LocalDateTime
 								.parse(payment.get().getPay().getLocaldate(), paymentDateFormat).format(payDateFormat));
 					}
-				} else if (fault.contains("not found")) {
-					LOG.error("Error payment:{} - unknow agreement:{}", payId, account);
-					processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_NOT_FOUND);
-				} else {
-					LOG.error("Error payment:{} - {}", payId, fault);
+					processResponse.setAmount(amount);
+				} else if (response.isFault()) {
+					String fault = (String) response.getBody();
+					// check if was duplicate payment
+					if (fault.contains("already exists")) {
+						Optional<SoapPaymentFull> payment = findPayment(session, payId);
+						if (payment.isPresent()) {
+							LOG.error("Error payment:{} - has already done", payId);
+							processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.PAY_TRX_DUPLICATE);
+							processResponse
+									.setExtId(Long.parseLong(fault.replaceFirst(".*\\(record_id = (\\d+)\\)$", "$1")));
+							processResponse.setAmount(payment.get().getAmountcurr());
+							processResponse.setRegDate(
+									LocalDateTime.parse(payment.get().getPay().getLocaldate(), paymentDateFormat)
+											.format(payDateFormat));
+						}
+					} else if (fault.contains("not found")) {
+						LOG.error("Error payment:{} - agreement:{} not found", payId, account);
+						processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_NOT_FOUND);
+					} else {
+						LOG.error("Error payment:{} - {}", payId, fault);
+					}
 				}
+			} else {
+				LOG.error("Error payment:{} - inactive agreement:{}", payId, account);
+				processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_INACTIVE);
 			}
 			disconnect(session);
 		}
@@ -533,21 +542,25 @@ public class LbSoapService {
 			LbServiceResponse response = callService(session, request);
 			if (response.isSuccess()) {
 				GetExternAccountResponse accountInfo = (GetExternAccountResponse) response.getBody();
-				if (!accountInfo.getRet().isEmpty()
-						&& accountInfo.getRet().get(0).getAgreements().get(0).getClosedon().isEmpty()) {
-					processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
-					if (!accountInfo.getRet().get(0).getAddresses().isEmpty()) {
-						processResponse.setAddress(accountInfo.getRet().get(0).getAddresses().get(0).getAddress());
+				if (!accountInfo.getRet().isEmpty()) {
+					Optional<SoapAgreement> agreement = accountInfo.getRet().get(0).getAgreements().stream()
+							.filter(agg -> agg.getNumber().equalsIgnoreCase(account)).findFirst();
+					if (agreement.isPresent() && agreement.get().getClosedon().isEmpty()) {
+						LOG.info("Success check agreement:{}", account);
+						processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
+						if (!accountInfo.getRet().get(0).getAddresses().isEmpty()) {
+							processResponse.setAddress(accountInfo.getRet().get(0).getAddresses().get(0).getAddress());
+						}
+						processResponse.setBalance(accountInfo.getRet().get(0).getAgreements().get(0).getBalance());
+						long argmid = accountInfo.getRet().get(0).getAgreements().get(0).getAgrmid();
+						Optional<Double> recPayment = getRecPayment(session, argmid);
+						if (recPayment.isPresent()) {
+							processResponse.setRecSum(recPayment.get());
+						}
+					} else if (agreement.isPresent() && !agreement.get().getClosedon().isEmpty()) {
+						LOG.error("Error check agreement:{} - inactive", account);
+						processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_INACTIVE);
 					}
-					processResponse.setBalance(accountInfo.getRet().get(0).getAgreements().get(0).getBalance());
-					long argmid = accountInfo.getRet().get(0).getAgreements().get(0).getAgrmid();
-					Optional<Double> recPayment = getRecPayment(session, argmid);
-					if (recPayment.isPresent()) {
-						processResponse.setRecSum(recPayment.get());
-					}
-				} else if (!accountInfo.getRet().isEmpty()
-						&& !accountInfo.getRet().get(0).getAgreements().get(0).getClosedon().isEmpty()) {
-					processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_INACTIVE);
 				}
 			} else {
 				LOG.error("Error check agreement:{} - {}", account, response.getBody());
