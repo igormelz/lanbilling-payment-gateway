@@ -9,7 +9,7 @@
 	</parent>
 	<groupId>ru.openfs</groupId>
 	<artifactId>lb-pay</artifactId>
-	<version>0.1.0</version>
+	<version>0.2.0</version>
 	<name>LanBilling Payment Gateway</name>
 	<description>billing payment gateway with support for Sberbank internet acquiring and fiscalization on Dreamkas OFD</description>
 
