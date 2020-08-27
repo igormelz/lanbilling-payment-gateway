@@ -124,7 +124,8 @@ public class LbSoapService {
 		if (response.isSuccess()) {
 			GetAgreementsResponse agreement = (GetAgreementsResponse) response.getBody();
 			if (!agreement.getRet().isEmpty()) {
-				return Optional.of(agreement.getRet().get(0));
+				return agreement.getRet().stream().filter(agr -> agr.getNumber().equalsIgnoreCase(number)).findFirst();
+				//return Optional.of(agreement.getRet().get(0));
 			}
 			LOG.warn("Agreement:{} is not found", number);
 			return Optional.empty();
@@ -544,7 +545,7 @@ public class LbSoapService {
 				GetExternAccountResponse accountInfo = (GetExternAccountResponse) response.getBody();
 				if (!accountInfo.getRet().isEmpty()) {
 					Optional<SoapAgreement> agreement = accountInfo.getRet().get(0).getAgreements().stream()
-							.filter(agg -> agg.getNumber().equalsIgnoreCase(account)).findFirst();
+							.filter(agr -> agr.getNumber().equalsIgnoreCase(account)).findFirst();
 					if (agreement.isPresent() && agreement.get().getClosedon().isEmpty()) {
 						LOG.info("Success check agreement:{}", account);
 						processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
