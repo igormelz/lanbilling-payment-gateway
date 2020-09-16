@@ -51,11 +51,17 @@ public class SberOnlineRoute extends RouteBuilder {
                         .log("Process check agreement:${header.ACCOUNT}")
                         .bean(lbapi,"processCheckPayment")
                     .otherwise()
-                        // process payment
+                        // urlEncode PAY_DATE
+                        .setHeader(PaymentGatewayConstants.PAY_DATE,simple("${header.PAY_DATE.replace('%3A',':')}"))
+                    
+                        // validate format
                         .validate(validAmount).validate(validPayId).validate(validPayDate)
-                        .log("Process payment:${header.PAY_ID} agreement:${header.ACCOUNT} amount:${header.AMOUNT}")
+                    
+                        // process payment
+                        .log("Process payment:${header.PAY_ID} agreement:${header.ACCOUNT} amount:${header.AMOUNT} date:${header.PAY_DATE}")
                         .bean(lbapi,"processDirectPayment")
                     .end()
+
                     // remove work headers
                     .removeHeaders("(ACTION|ACCOUNT|PAY_ID|PAY_DATE|AMOUNT)");
     }

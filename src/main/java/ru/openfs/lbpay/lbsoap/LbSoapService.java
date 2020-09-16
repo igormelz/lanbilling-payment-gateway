@@ -473,7 +473,8 @@ public class LbSoapService {
 						processResponse.setRegDate(LocalDateTime
 								.parse(payment.get().getPay().getLocaldate(), paymentDateFormat).format(payDateFormat));
 					}
-					processResponse.setAmount(amount);
+					// change AMOUNT to SUM
+					processResponse.setSum(amount);
 				} else if (response.isFault()) {
 					String fault = (String) response.getBody();
 					// check if was duplicate payment

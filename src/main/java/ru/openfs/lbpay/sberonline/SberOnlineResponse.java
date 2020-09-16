@@ -67,6 +67,9 @@ public class SberOnlineResponse {
    @XmlElement(name = "AMOUNT")
    private Double amount;
 
+   @XmlElement(name = "SUM")
+   private Double sum;
+
    @XmlElement(name = "REC_SUM")
    private Double recSum;
 
@@ -102,6 +105,10 @@ public class SberOnlineResponse {
 
    public void setAmount(Double amount) {
       this.amount = amount;
+   }
+
+   public void setSum(Double sum) {
+      this.sum = sum;
    }
 
    public void setRecSum(Double recSum) {
