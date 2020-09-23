@@ -5,6 +5,8 @@ import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
+import ru.openfs.lbpay.lbsoap.model.LbPaymentInfo;
+
 @XmlRootElement(name = "response")
 @XmlAccessorType(XmlAccessType.NONE)
 public class SberOnlineResponse {
@@ -76,6 +78,8 @@ public class SberOnlineResponse {
    @XmlElement(name = "EXT_ID")
    private Long extId;
 
+   private LbPaymentInfo paymentInfo;
+
    public SberOnlineResponse() {
    }
 
@@ -119,6 +123,19 @@ public class SberOnlineResponse {
       this.extId = extId;
    }
    
+   public void setPaymentInfo(LbPaymentInfo info) {
+      this.paymentInfo = info;
+   }
+
+   // getter 
+   public int getCode() {
+      return this.code;
+   }
+
+   public LbPaymentInfo getPaymentInfo() {
+      return this.paymentInfo;
+   }
+
    // base response
    public SberOnlineResponse(CodeResponse codeResponse) {
       this.code = codeResponse.getCode();

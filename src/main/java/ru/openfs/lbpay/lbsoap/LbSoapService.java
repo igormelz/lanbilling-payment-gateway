@@ -475,6 +475,8 @@ public class LbSoapService {
 					}
 					// change AMOUNT to SUM
 					processResponse.setSum(amount);
+					// get paymentInfo 
+					processResponse.setPaymentInfo(getPaymentInfo(session, payment.get().getUid(), amount));
 				} else if (response.isFault()) {
 					String fault = (String) response.getBody();
 					// check if was duplicate payment
