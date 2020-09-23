@@ -62,9 +62,9 @@ public class SberOnlineRoute extends RouteBuilder {
                         .bean(lbapi,"processDirectPayment")
                         // check success 
                         .filter(simple("${body.getCode} == 0"))
-                            .setHeader(PaymentGatewayConstants.ORDER_NUMBER,header(PaymentGatewayConstants.PAY_ID))
-                            .setHeader(PaymentGatewayConstants.SBER_ORDER_NUMBER,header(PaymentGatewayConstants.PAY_ID))
-                            .setHeader(PaymentGatewayConstants.ORDER_AMOUNT,simple("${body.paymentInfo.amount}"))
+                            .setHeader(PaymentGatewayConstants.ORDER_NUMBER, header(PaymentGatewayConstants.PAY_ID))
+                            .setHeader(PaymentGatewayConstants.SBER_ORDER_NUMBER, header(PaymentGatewayConstants.PAY_ID))
+                            .setHeader(PaymentGatewayConstants.ORDER_AMOUNT, simple("${body.paymentInfo.amount}"))
                             .setHeader(PaymentGatewayConstants.CUSTOMER_PHONE, simple("${body.paymentInfo.customerPhone}"))
                             .setHeader(PaymentGatewayConstants.CUSTOMER_EMAIL, simple("${body.paymentInfo.customerEmail}"))
                             .setHeader(PaymentGatewayConstants.RECEIPT_TYPE,constant("SALE"))
@@ -76,7 +76,7 @@ public class SberOnlineRoute extends RouteBuilder {
                     .end()
 
                     // remove work headers
-                    .removeHeaders("(ACTION|ACCOUNT|PAY_ID|PAY_DATE|AMOUNT)");
+                    .removeHeaders("(ACTION|ACCOUNT|PAY_ID|PAY_DATE|AMOUNT|phone|email|mdOrder|orderNumber|receiptType)");
     }
 
 }
