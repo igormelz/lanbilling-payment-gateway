@@ -58,7 +58,7 @@ public class SberOnlineRoute extends RouteBuilder {
                         .validate(validAmount).validate(validPayId).validate(validPayDate)
                     
                         // process payment
-                        .log("Process payment:${header.PAY_ID} agreement:${header.ACCOUNT} amount:${header.AMOUNT} date:${header.PAY_DATE}")
+                        .log("Process order:${header.PAY_ID} agreement:${header.ACCOUNT} amount:${header.AMOUNT} date:${header.PAY_DATE}")
                         .bean(lbapi,"processDirectPayment")
                         // check success 
                         .filter(simple("${body.getCode} == 0"))

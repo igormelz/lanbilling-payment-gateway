@@ -419,7 +419,7 @@ public class LbSoapService {
 
 		// validate account format
 		if (!account.matches("\\d+$")) {
-			LOG.error("Error payment:{} - agreement:{} has bad format", payId, account);
+			LOG.error("Error order:{} - agreement:{} has bad format", payId, account);
 			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_WRONG_FORMAT);
 		}
 
@@ -428,13 +428,13 @@ public class LbSoapService {
 		try {
 			paymentDateTime = LocalDateTime.parse(payDate, payDateFormat).format(paymentDateFormat);
 		} catch (DateTimeException ex) {
-			LOG.error("Error payment:{} - paydate:{} not parsed:{}", payId, payDate, ex.getMessage());
+			LOG.error("Error order:{} - paydate:{} not parsed:{}", payId, payDate, ex.getMessage());
 			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.WRONG_FORMAT_DATE);
 		}
 
 		// validate amount
 		if (amount <= 0) {
-			LOG.error("Error payment:{} - amount:{} too small", payId, amount);
+			LOG.error("Error order:{} - amount:{} too small", payId, amount);
 			return new SberOnlineResponse(SberOnlineResponse.CodeResponse.PAY_AMOUNT_TOO_SMALL);
 		}
 
@@ -462,7 +462,7 @@ public class LbSoapService {
 				request.setOperid(0L);
 				LbServiceResponse response = callService(session, request);
 				if (response.isSuccess()) {
-					LOG.info("Success payment:{} agreement:{} amount:{}", payId, account, amount);
+					LOG.info("Success payment order:{} agreement:{} amount:{}", payId, account, amount);
 					processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.OK);
 					// get transaction id
 					ExternPaymentResponse ret = (ExternPaymentResponse) response.getBody();
@@ -483,7 +483,7 @@ public class LbSoapService {
 					if (fault.contains("already exists")) {
 						Optional<SoapPaymentFull> payment = findPayment(session, payId);
 						if (payment.isPresent()) {
-							LOG.error("Error payment:{} - has already done", payId);
+							LOG.error("Error order:{} - has already done", payId);
 							processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.PAY_TRX_DUPLICATE);
 							processResponse
 									.setExtId(Long.parseLong(fault.replaceFirst(".*\\(record_id = (\\d+)\\)$", "$1")));
@@ -493,14 +493,14 @@ public class LbSoapService {
 											.format(payDateFormat));
 						}
 					} else if (fault.contains("not found")) {
-						LOG.error("Error payment:{} - agreement:{} not found", payId, account);
+						LOG.error("Error order:{} - agreement:{} not found", payId, account);
 						processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_NOT_FOUND);
 					} else {
-						LOG.error("Error payment:{} - {}", payId, fault);
+						LOG.error("Error order:{} - {}", payId, fault);
 					}
 				}
 			} else {
-				LOG.error("Error payment:{} - inactive agreement:{}", payId, account);
+				LOG.error("Error order:{} - inactive agreement:{}", payId, account);
 				processResponse = new SberOnlineResponse(SberOnlineResponse.CodeResponse.ACCOUNT_INACTIVE);
 			}
 			disconnect(session);
