@@ -12,6 +12,8 @@ import ru.openfs.lbpay.lbsoap.LbSoapService;
 
 import static org.apache.camel.builder.PredicateBuilder.and;
 
+import java.util.UUID;
+
 import org.apache.camel.LoggingLevel;
 
 @Component
@@ -22,6 +24,7 @@ public class SberOnlineRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
+        ExternalId keyGen = new ExternalId();
 
         SberOnlineResponseFactory response = new SberOnlineResponseFactory();
         Predicate validAction = and(header(PaymentGatewayConstants.ACTION).isNotNull(),
@@ -63,7 +66,7 @@ public class SberOnlineRoute extends RouteBuilder {
                         // check success 
                         .filter(simple("${body.getCode} == 0"))
                             .setHeader(PaymentGatewayConstants.ORDER_NUMBER, header(PaymentGatewayConstants.PAY_ID))
-                            .setHeader(PaymentGatewayConstants.SBER_ORDER_NUMBER, header(PaymentGatewayConstants.PAY_ID))
+                            .setHeader(PaymentGatewayConstants.SBER_ORDER_NUMBER, method(keyGen,"getId"))
                             .setHeader(PaymentGatewayConstants.ORDER_AMOUNT, simple("${body.paymentInfo.amount}"))
                             .setHeader(PaymentGatewayConstants.CUSTOMER_PHONE, simple("${body.paymentInfo.customerPhone}"))
                             .setHeader(PaymentGatewayConstants.CUSTOMER_EMAIL, simple("${body.paymentInfo.customerEmail}"))
@@ -79,4 +82,11 @@ public class SberOnlineRoute extends RouteBuilder {
                     .removeHeaders("(ACTION|ACCOUNT|PAY_ID|PAY_DATE|AMOUNT|phone|email|mdOrder|orderNumber|receiptType)");
     }
 
+    // gen externalId 
+    class ExternalId {
+        public ExternalId() {}
+        public String getId() {
+            return UUID.randomUUID().toString();
+        } 
+    }
 }
